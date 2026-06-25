@@ -13,6 +13,13 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Nexmart", version="1.0.0")
 app.state.limiter = limiter
 
+
+@app.get("/")
+@app.head("/")
+async def root():
+    return {"message": "Nexmart API is running"}
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],
