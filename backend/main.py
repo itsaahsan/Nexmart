@@ -49,6 +49,11 @@ app.include_router(newsletter.router, prefix="/api/newsletter", tags=["Newslette
 @app.on_event("startup")
 async def startup():
     await init_db()
+    try:
+        from seed import seed
+        await seed()
+    except Exception as e:
+        print(f"Seed skipped: {e}")
 
 
 @app.on_event("shutdown")
