@@ -10,7 +10,7 @@ from redis_client import redis_client
 
 limiter = Limiter(key_func=get_remote_address)
 
-app = FastAPI(title="Nexmart API", version="1.0.0")
+app = FastAPI(title="Nexmart", version="1.0.0")
 app.state.limiter = limiter
 
 app.add_middleware(
