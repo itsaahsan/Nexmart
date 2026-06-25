@@ -25,9 +25,11 @@ app.add_middleware(
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    import traceback
+    traceback.print_exc()
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": str(exc)},
     )
 
 from routers import auth, products, categories, cart, orders, reviews, wishlist, addresses, admin, newsletter
