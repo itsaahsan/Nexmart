@@ -15,7 +15,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: FRONTEND_URL
-        value: https://nexmart-frontend.onrender.com
+        value: https://nexmart-zhml.onrender.com
       - key: PYTHON_VERSION
         value: "3.11"
       - key: STRIPE_SECRET_KEY
@@ -28,7 +28,7 @@ services:
         sync: false
 
   - type: static_site
-    name: nexmart-frontend
+    name: nexmart
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
@@ -38,4 +38,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://nexmart-backend.onrender.com
+        value: https://nexmart-backend-cxwu.onrender.com
