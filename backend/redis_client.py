@@ -9,23 +9,35 @@ redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
 
 
 async def cache_get(key: str) -> Any | None:
-    data = await redis_client.get(key)
-    if data:
-        return json.loads(data)
+    try:
+        data = await redis_client.get(key)
+        if data:
+            return json.loads(data)
+    except Exception:
+        pass
     return None
 
 
 async def cache_set(key: str, value: Any, ttl: int = 300) -> None:
-    await redis_client.set(key, json.dumps(value, default=str), ex=ttl)
+    try:
+        await redis_client.set(key, json.dumps(value, default=str), ex=ttl)
+    except Exception:
+        pass
 
 
 async def cache_delete(key: str) -> None:
-    await redis_client.delete(key)
+    try:
+        await redis_client.delete(key)
+    except Exception:
+        pass
 
 
 async def cache_delete_pattern(pattern: str) -> None:
-    keys = []
-    async for key in redis_client.scan_iter(match=pattern):
-        keys.append(key)
-    if keys:
-        await redis_client.delete(*keys)
+    try:
+        keys = []
+        async for key in redis_client.scan_iter(match=pattern):
+            keys.append(key)
+        if keys:
+            await redis_client.delete(*keys)
+    except Exception:
+        pass
