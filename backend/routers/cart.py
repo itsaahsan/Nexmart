@@ -1,4 +1,5 @@
 import json
+import uuid
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,23 +34,49 @@ async def _save_cart(user_id: str, cart: dict) -> None:
 
 
 @router.get("", response_model=CartResponse)
-async def get_cart(current_user: User = Depends(get_current_user)):
+async def get_cart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     cart = await _get_cart(str(current_user.id))
     items = []
     total = 0.0
+    changed = False
+
+    product_ids = [uuid.UUID(pid) for pid in cart.keys()]
+    if product_ids:
+        result = await db.execute(
+            select(Product).where(Product.id.in_(product_ids), Product.is_active == True)
+        )
+        existing = {str(p.id): p for p in result.scalars().all()}
+    else:
+        existing = {}
 
     for product_id_str, item_data in cart.items():
+        product = existing.get(product_id_str)
+        if not product:
+            del cart[product_id_str]
+            changed = True
+            continue
+        quantity = min(item_data["quantity"], product.stock)
+        if quantity <= 0:
+            del cart[product_id_str]
+            changed = True
+            continue
         items.append(
             CartItemResponse(
                 product_id=product_id_str,
-                name=item_data["name"],
-                price=item_data["price"],
-                image_url=item_data["image_url"],
-                quantity=item_data["quantity"],
-                stock=item_data["stock"],
+                name=product.name,
+                price=product.price,
+                image_url=product.image_url,
+                quantity=quantity,
+                stock=product.stock,
             )
         )
-        total += item_data["price"] * item_data["quantity"]
+        total += product.price * quantity
+
+    if changed:
+        await _save_cart(str(current_user.id), cart)
 
     return CartResponse(items=items, total=round(total, 2), item_count=len(items))
 

@@ -5,7 +5,16 @@ import redis.asyncio as redis
 
 from settings import settings
 
-redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+def _normalize_redis_url(url: str) -> str:
+    if url.startswith("http://"):
+        url = "redis://" + url[len("http://"):]
+    elif url.startswith("https://"):
+        url = "rediss://" + url[len("https://"):]
+    return url
+
+
+redis_client = redis.from_url(_normalize_redis_url(settings.REDIS_URL), decode_responses=True)
 
 
 async def cache_get(key: str) -> Any | None:
