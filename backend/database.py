@@ -17,10 +17,15 @@ def _normalize_database_url(url: str) -> str:
 
     parsed = urlparse(url)
     params = parse_qs(parsed.query, keep_blank_values=True)
-    if "sslmode" not in params and "ssl" not in params:
-        if "neon.tech" in (parsed.hostname or "") or "render.com" in (parsed.hostname or ""):
+
+    if "sslmode" in params:
+        del params["sslmode"]
+    if "ssl" not in params:
+        hostname = (parsed.hostname or "").lower()
+        if "neon.tech" in hostname or "render.com" in hostname:
             params["ssl"] = ["require"]
-            url = urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
+
+    url = urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
     return url
 
 
