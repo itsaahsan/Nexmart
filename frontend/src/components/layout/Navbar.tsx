@@ -90,7 +90,7 @@ export default function Navbar() {
 
             <div className="relative" ref={userMenuRef}>
               {isAuthenticated ? (
-                <button type="button" onMouseDown={(e) => { e.stopPropagation() }} onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
                   {user?.avatar_url ? (
                     <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
@@ -99,9 +99,7 @@ export default function Navbar() {
                   <ChevronDown size={16} className="text-text-secondary" />
                 </button>
               ) : (
-                <button type="button" onMouseDown={(e) => { e.stopPropagation() }} onClick={() => navigate('/login')} className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors text-text-secondary hover:text-text-primary">
-                  <User size={20} />
-                </button>
+                <Link to="/login" className="p-2 hover:bg-gray-100 rounded-lg transition-colors inline-flex items-center justify-center"><User size={20} className="text-text-secondary" /></Link>
               )}
 
               {userMenuOpen && isAuthenticated && (
@@ -136,6 +134,15 @@ export default function Navbar() {
               <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search products..." className="w-full rounded-lg border border-border px-4 py-2.5 text-sm" />
             </form>
             <Link to="/products" className="block py-2 text-sm font-medium text-text-secondary hover:text-accent">Shop</Link>
+            {isAuthenticated ? (
+              <>
+                <Link to="/dashboard" className="block py-2 text-sm font-medium text-text-secondary hover:text-accent">Dashboard</Link>
+                <Link to="/orders" className="block py-2 text-sm font-medium text-text-secondary hover:text-accent">Orders</Link>
+                <button onClick={() => { logout(); navigate('/') }} className="block py-2 text-sm font-medium text-error hover:text-error">Sign Out</button>
+              </>
+            ) : (
+              <Link to="/login" className="block py-2 text-sm font-medium text-accent hover:text-accent-hover">Log In</Link>
+            )}
           </div>
         </div>
       )}
