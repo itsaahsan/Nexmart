@@ -90,7 +90,7 @@ export default function Navbar() {
 
             <div className="relative" ref={userMenuRef}>
               {isAuthenticated ? (
-                <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <button type="button" onMouseDown={(e) => { e.stopPropagation() }} onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors">
                   {user?.avatar_url ? (
                     <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
                   ) : (
@@ -99,7 +99,9 @@ export default function Navbar() {
                   <ChevronDown size={16} className="text-text-secondary" />
                 </button>
               ) : (
-                <Link to="/login" className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><User size={20} /></Link>
+                <button type="button" onMouseDown={(e) => { e.stopPropagation() }} onClick={() => navigate('/login')} className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors text-text-secondary hover:text-text-primary">
+                  <User size={20} />
+                </button>
               )}
 
               {userMenuOpen && isAuthenticated && (
