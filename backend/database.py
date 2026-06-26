@@ -34,7 +34,6 @@ engine = create_async_engine(
     _normalize_database_url(settings.DATABASE_URL),
     echo=False,
     pool_pre_ping=True,
-    connect_args={"timeout": 10},
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -61,6 +60,14 @@ async def init_db(max_retries=5, delay=5):
             print("Database connected successfully")
             return
         except Exception as e:
+            err_str = str(e)
+            if "incompatible types" in err_str or "already exists" in err_str:
+                print("Schema mismatch detected, recreating tables...")
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.drop_all)
+                    await conn.run_sync(Base.metadata.create_all)
+                print("Database schema recreated successfully")
+                return
             print(f"Database connection attempt {attempt}/{max_retries} failed: {e}")
             if attempt < max_retries:
                 await asyncio.sleep(delay * attempt)
