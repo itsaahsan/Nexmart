@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 from settings import settings
 
@@ -13,6 +14,13 @@ def _normalize_database_url(url: str) -> str:
         url = "postgresql://" + url[len("postgres://"):]
     if "+" not in url.split("://")[0]:
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    if "sslmode" not in params and "ssl" not in params:
+        if "neon.tech" in (parsed.hostname or "") or "render.com" in (parsed.hostname or ""):
+            params["ssl"] = ["require"]
+            url = urlunparse(parsed._replace(query=urlencode(params, doseq=True)))
     return url
 
 

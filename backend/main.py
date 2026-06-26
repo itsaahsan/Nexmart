@@ -65,7 +65,11 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    await redis_client.aclose()
+    if redis_client:
+        try:
+            await redis_client.aclose()
+        except Exception:
+            pass
 
 
 @app.get("/api/health")
