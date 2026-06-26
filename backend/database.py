@@ -64,8 +64,10 @@ async def init_db(max_retries=5, delay=5):
             if "incompatible types" in err_str or "does not exist" in err_str:
                 print("Schema conflict detected, recreating all tables...")
                 try:
+                    from sqlalchemy import text
                     async with engine.begin() as conn:
-                        await conn.run_sync(Base.metadata.drop_all)
+                        await conn.execute(text("DROP SCHEMA public CASCADE"))
+                        await conn.execute(text("CREATE SCHEMA public"))
                     async with engine.begin() as conn:
                         await conn.run_sync(Base.metadata.create_all)
                     print("Schema recreated successfully")
