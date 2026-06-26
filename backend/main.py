@@ -12,6 +12,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(title="Nexmart", version="1.0.0")
 app.state.limiter = limiter
+app.state.db_ready = False
 
 
 @app.get("/")
@@ -55,7 +56,13 @@ app.include_router(newsletter.router, prefix="/api/newsletter", tags=["Newslette
 
 @app.on_event("startup")
 async def startup():
-    await init_db()
+    try:
+        await init_db()
+        app.state.db_ready = True
+    except Exception as e:
+        print(f"Database startup failed: {e}")
+        print("App is running but database is not available yet.")
+
     try:
         from seed import seed
         await seed()
@@ -74,4 +81,4 @@ async def shutdown():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "db_ready": app.state.db_ready}

@@ -1,3 +1,4 @@
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
@@ -29,7 +30,12 @@ def _normalize_database_url(url: str) -> str:
     return url
 
 
-engine = create_async_engine(_normalize_database_url(settings.DATABASE_URL), echo=False)
+engine = create_async_engine(
+    _normalize_database_url(settings.DATABASE_URL),
+    echo=False,
+    pool_pre_ping=True,
+    connect_args={"timeout": 10},
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -47,6 +53,16 @@ async def get_db():
             raise
 
 
-async def init_db():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+async def init_db(max_retries=5, delay=5):
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            print("Database connected successfully")
+            return
+        except Exception as e:
+            print(f"Database connection attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                await asyncio.sleep(delay * attempt)
+            else:
+                raise
