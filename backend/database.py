@@ -56,11 +56,21 @@ async def init_db(max_retries=5, delay=5):
     for attempt in range(1, max_retries + 1):
         try:
             async with engine.begin() as conn:
-                await conn.run_sync(Base.metadata.drop_all)
                 await conn.run_sync(Base.metadata.create_all)
-            print("Database connected and tables created successfully")
+            print("Database connected successfully")
             return
         except Exception as e:
+            err_str = str(e).lower()
+            if "incompatible types" in err_str or "does not exist" in err_str:
+                print("Schema conflict detected, recreating all tables...")
+                try:
+                    async with engine.begin() as conn:
+                        await conn.run_sync(Base.metadata.drop_all)
+                        await conn.run_sync(Base.metadata.create_all)
+                    print("Schema recreated successfully")
+                    return
+                except Exception as e2:
+                    print(f"Schema recreation failed: {e2}")
             print(f"Database connection attempt {attempt}/{max_retries} failed: {e}")
             if attempt < max_retries:
                 await asyncio.sleep(delay * attempt)
