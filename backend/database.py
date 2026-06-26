@@ -68,6 +68,8 @@ async def init_db(max_retries=5, delay=5):
                     async with engine.begin() as conn:
                         await conn.execute(text("DROP SCHEMA public CASCADE"))
                         await conn.execute(text("CREATE SCHEMA public"))
+                        await conn.execute(text("GRANT ALL ON SCHEMA public TO neondb_owner"))
+                        await conn.execute(text("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO neondb_owner"))
                     async with engine.begin() as conn:
                         await conn.run_sync(Base.metadata.create_all)
                     print("Schema recreated successfully")
