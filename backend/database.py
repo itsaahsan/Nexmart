@@ -66,6 +66,7 @@ async def init_db(max_retries=5, delay=5):
                 try:
                     async with engine.begin() as conn:
                         await conn.run_sync(Base.metadata.drop_all)
+                    async with engine.begin() as conn:
                         await conn.run_sync(Base.metadata.create_all)
                     print("Schema recreated successfully")
                     return
