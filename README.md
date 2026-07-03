@@ -14,6 +14,13 @@ A modern e-commerce platform built with React, FastAPI, PostgreSQL, and Redis.
 | Image Upload | Cloudinary |
 | Auth | JWT (access + refresh tokens) |
 
+## Why These Choices
+
+- **FastAPI with async SQLAlchemy** instead of sync Django/Flask — e-commerce endpoints like product search and cart operations benefit from non-blocking I/O under concurrent load, and Pydantic v2 gives strict request/response validation for free.
+- **Zustand over Redux** for frontend state — cart and wishlist state is relatively simple and localized; Zustand avoids the boilerplate of Redux for a state shape that doesn't need time-travel debugging or complex middleware.
+- **Redis as a cache layer** — sits in front of frequently-read, rarely-changed data (product listings, categories) to reduce database load, while PostgreSQL stays the source of truth for orders and inventory.
+- **Docker Compose for local dev, split hosts for production** (Render for backend/DB, Vercel for frontend) — mirrors a realistic production setup where frontend and backend scale independently, rather than a monolithic deployment.
+
 ## Features
 
 - Product browsing with search, filters, and sorting
@@ -147,19 +154,14 @@ git push -u origin main
 5. Click **Create Web Service**
 6. Render will build and deploy automatically
 7. Your backend URL will be something like: `https://nexmart-backend.onrender.com`
-8. **Seed the database** — after deployment, go to Logs tab and check for "Database seeded successfully". If not, visit `https://nexmart-backend.onrender.com/docs` and manually trigger seed, or run:
-   ```bash
-   curl -X POST https://nexmart-backend.onrender.com/api/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"email":"admin@nexmart.com","full_name":"Admin","password":"Admin1234"}'
-   ```
+8. **Seed the database** — after deployment, go to the Logs tab and check for "Database seeded successfully." If the seed didn't run automatically, use the register endpoint to create your own admin account (see Step 4) rather than a shared default one.
 
 #### Step 4: Create Admin User
 
-After backend deploys, create an admin user by registering via the API, then use the Render Shell or a database client to set `is_admin=true`:
+After backend deploys, register an admin account via `POST /api/auth/register` with your own email and a strong password (not a published default), then use the Render Shell or a database client to grant admin rights:
 
 ```sql
-UPDATE users SET is_admin=true WHERE email='admin@nexmart.com';
+UPDATE users SET is_admin=true WHERE email='<your-email>';
 ```
 
 ---
@@ -254,3 +256,7 @@ Render will auto-redeploy.
 ## License
 
 MIT
+
+## Author
+
+**Amimul Ahsan** - [GitHub](https://github.com/itsaahsan)
