@@ -2,6 +2,12 @@
 
 A modern e-commerce platform built with React, FastAPI, PostgreSQL, and Redis.
 
+## Live Demo
+
+- **App**: https://nexmart-zhml.onrender.com
+
+> Hosted on Render's free tier — the first request after inactivity may take a few seconds to spin up.
+
 ## Tech Stack
 
 | Layer | Technology |
