@@ -42,3 +42,5 @@ test.db
 
 # Vercel
 .vercel/
+.vercel
+.env*
