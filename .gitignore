@@ -25,9 +25,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Docker
-docker-compose.override.yml
-
 # Database
 *.db
 test.db
@@ -43,4 +40,3 @@ test.db
 # Vercel
 .vercel/
 .vercel
-.env*
