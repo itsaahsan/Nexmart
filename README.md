@@ -1,12 +1,14 @@
 # Nexmart — Full-Stack E-Commerce Platform
 
-A modern e-commerce platform built with React, FastAPI, PostgreSQL.
+A modern e-commerce platform built with React, FastAPI, and PostgreSQL.
 
 ## Live Demo
 
-- **App**: https://nexmart-ecommerce.vercel.app
-- **API**: https://nexmart-backend.vercel.app
-- **API Docs**: https://nexmart-backend.vercel.app/docs
+🔗 **Frontend**: https://nexmart-ecommerce.vercel.app  
+🔗 **Backend API**: https://nexmart-backend.vercel.app  
+📖 **API Docs (Swagger)**: https://nexmart-backend.vercel.app/docs  
+📋 **API Docs (ReDoc)**: https://nexmart-backend.vercel.app/redoc  
+💻 **Source Code**: https://github.com/itsaahsan/Nexmart
 
 ## Tech Stack
 
