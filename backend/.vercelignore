@@ -1,0 +1,11 @@
+tests/
+alembic/
+alembic.ini
+conftest.py
+.git/
+__pycache__/
+*.pyc
+.env
+.env.example
+render.yaml
+README.md

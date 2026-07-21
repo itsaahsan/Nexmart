@@ -39,3 +39,6 @@ test.db
 
 # React
 *.tsbuildinfo
+
+# Vercel
+.vercel/
