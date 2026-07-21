@@ -6,6 +6,7 @@ A modern e-commerce platform built with React, FastAPI, PostgreSQL, and Redis.
 
 - **App**: https://nexmart-app.vercel.app
 - **API**: https://nexmart-backend.vercel.app
+- **API Docs**: https://nexmart-backend.vercel.app/docs
 
 ## Tech Stack
 
