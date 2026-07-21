@@ -6,6 +6,7 @@ from .review import Review
 from .address import Address
 from .wishlist import Wishlist
 from .newsletter import Newsletter
+from .cart import CartItem
 
 __all__ = [
     "User",
@@ -17,4 +18,5 @@ __all__ = [
     "Address",
     "Wishlist",
     "Newsletter",
+    "CartItem",
 ]

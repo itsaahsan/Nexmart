@@ -1,36 +1,15 @@
-import json
-import uuid
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from models.cart import CartItem
 from models.product import Product
 from models.user import User
-from redis_client import redis_client
 from schemas.wishlist import CartItemAdd, CartItemResponse, CartItemUpdate, CartResponse
 from utils.auth import get_current_user
 
 router = APIRouter()
-
-CART_TTL = 86400
-
-
-def _cart_key(user_id: str) -> str:
-    return f"cart:{user_id}"
-
-
-async def _get_cart(user_id: str) -> dict:
-    data = await redis_client.get(_cart_key(user_id))
-    if data:
-        return json.loads(data)
-    return {}
-
-
-async def _save_cart(user_id: str, cart: dict) -> None:
-    await redis_client.set(_cart_key(user_id), json.dumps(cart), ex=CART_TTL)
 
 
 @router.get("", response_model=CartResponse)
@@ -38,34 +17,29 @@ async def get_cart(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    cart = await _get_cart(str(current_user.id))
+    result = await db.execute(
+        select(CartItem, Product)
+        .join(Product, CartItem.product_id == Product.id)
+        .where(CartItem.user_id == current_user.id, Product.is_active == True)
+    )
+    rows = result.all()
+
     items = []
     total = 0.0
     changed = False
 
-    product_ids = [uuid.UUID(pid) for pid in cart.keys()]
-    if product_ids:
-        result = await db.execute(
-            select(Product).where(Product.id.in_(product_ids), Product.is_active == True)
-        )
-        existing = {str(p.id): p for p in result.scalars().all()}
-    else:
-        existing = {}
-
-    for product_id_str, item_data in cart.items():
-        product = existing.get(product_id_str)
-        if not product:
-            del cart[product_id_str]
+    for cart_row, product in rows:
+        if product.stock <= 0:
+            await db.delete(cart_row)
             changed = True
             continue
-        quantity = min(item_data["quantity"], product.stock)
-        if quantity <= 0:
-            del cart[product_id_str]
+        quantity = min(cart_row.quantity, product.stock)
+        if quantity != cart_row.quantity:
+            cart_row.quantity = quantity
             changed = True
-            continue
         items.append(
             CartItemResponse(
-                product_id=product_id_str,
+                product_id=str(product.id),
                 name=product.name,
                 price=product.price,
                 image_url=product.image_url,
@@ -74,9 +48,6 @@ async def get_cart(
             )
         )
         total += product.price * quantity
-
-    if changed:
-        await _save_cart(str(current_user.id), cart)
 
     return CartResponse(items=items, total=round(total, 2), item_count=len(items))
 
@@ -94,38 +65,21 @@ async def add_to_cart(
     if product.stock < data.quantity:
         raise HTTPException(status_code=400, detail="Insufficient stock")
 
-    cart = await _get_cart(str(current_user.id))
-    pid_str = str(data.product_id)
-
-    if pid_str in cart:
-        cart[pid_str]["quantity"] += data.quantity
-    else:
-        cart[pid_str] = {
-            "name": product.name,
-            "price": product.price,
-            "image_url": product.image_url,
-            "quantity": data.quantity,
-            "stock": product.stock,
-        }
-
-    await _save_cart(str(current_user.id), cart)
-
-    items = []
-    total = 0.0
-    for pid, item_data in cart.items():
-        items.append(
-            CartItemResponse(
-                product_id=pid,
-                name=item_data["name"],
-                price=item_data["price"],
-                image_url=item_data["image_url"],
-                quantity=item_data["quantity"],
-                stock=item_data["stock"],
-            )
+    result = await db.execute(
+        select(CartItem).where(
+            CartItem.user_id == current_user.id,
+            CartItem.product_id == data.product_id,
         )
-        total += item_data["price"] * item_data["quantity"]
+    )
+    existing = result.scalar_one_or_none()
 
-    return CartResponse(items=items, total=round(total, 2), item_count=len(items))
+    if existing:
+        existing.quantity += data.quantity
+    else:
+        db.add(CartItem(user_id=current_user.id, product_id=data.product_id, quantity=data.quantity))
+
+    await db.flush()
+    return await _cart_response(current_user.id, db)
 
 
 @router.put("/{product_id}", response_model=CartResponse)
@@ -133,52 +87,57 @@ async def update_cart_item(
     product_id: str,
     data: CartItemUpdate,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    cart = await _get_cart(str(current_user.id))
-
-    if product_id not in cart:
+    result = await db.execute(
+        select(CartItem).where(
+            CartItem.user_id == current_user.id,
+            CartItem.product_id == product_id,
+        )
+    )
+    cart_row = result.scalar_one_or_none()
+    if not cart_row:
         raise HTTPException(status_code=404, detail="Item not in cart")
 
     if data.quantity <= 0:
-        del cart[product_id]
+        await db.delete(cart_row)
     else:
-        cart[product_id]["quantity"] = data.quantity
+        cart_row.quantity = data.quantity
 
-    await _save_cart(str(current_user.id), cart)
-
-    items = []
-    total = 0.0
-    for pid, item_data in cart.items():
-        items.append(
-            CartItemResponse(
-                product_id=pid,
-                name=item_data["name"],
-                price=item_data["price"],
-                image_url=item_data["image_url"],
-                quantity=item_data["quantity"],
-                stock=item_data["stock"],
-            )
-        )
-        total += item_data["price"] * item_data["quantity"]
-
-    return CartResponse(items=items, total=round(total, 2), item_count=len(items))
+    await db.flush()
+    return await _cart_response(current_user.id, db)
 
 
 @router.delete("/{product_id}")
 async def remove_from_cart(
     product_id: str,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    cart = await _get_cart(str(current_user.id))
-    if product_id in cart:
-        del cart[product_id]
-        await _save_cart(str(current_user.id), cart)
+    result = await db.execute(
+        select(CartItem).where(
+            CartItem.user_id == current_user.id,
+            CartItem.product_id == product_id,
+        )
+    )
+    cart_row = result.scalar_one_or_none()
+    if cart_row:
+        await db.delete(cart_row)
+        await db.flush()
     return {"message": "Item removed"}
 
 
 @router.delete("")
-async def clear_cart(current_user: User = Depends(get_current_user)):
-    await redis_client.delete(_cart_key(str(current_user.id)))
+async def clear_cart(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(CartItem).where(CartItem.user_id == current_user.id)
+    )
+    for row in result.scalars().all():
+        await db.delete(row)
+    await db.flush()
     return {"message": "Cart cleared"}
 
 
@@ -188,25 +147,50 @@ async def merge_guest_cart(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    cart = await _get_cart(str(current_user.id))
-
     for item in guest_items:
         result = await db.execute(select(Product).where(Product.id == item.product_id))
         product = result.scalar_one_or_none()
         if not product or product.stock < item.quantity:
             continue
 
-        pid_str = str(item.product_id)
-        if pid_str in cart:
-            cart[pid_str]["quantity"] += item.quantity
+        result = await db.execute(
+            select(CartItem).where(
+                CartItem.user_id == current_user.id,
+                CartItem.product_id == item.product_id,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if existing:
+            existing.quantity += item.quantity
         else:
-            cart[pid_str] = {
-                "name": product.name,
-                "price": product.price,
-                "image_url": product.image_url,
-                "quantity": item.quantity,
-                "stock": product.stock,
-            }
+            db.add(CartItem(user_id=current_user.id, product_id=item.product_id, quantity=item.quantity))
 
-    await _save_cart(str(current_user.id), cart)
+    await db.flush()
     return {"message": "Cart merged"}
+
+
+async def _cart_response(user_id, db: AsyncSession) -> CartResponse:
+    result = await db.execute(
+        select(CartItem, Product)
+        .join(Product, CartItem.product_id == Product.id)
+        .where(CartItem.user_id == user_id, Product.is_active == True)
+    )
+    rows = result.all()
+
+    items = []
+    total = 0.0
+    for cart_row, product in rows:
+        quantity = min(cart_row.quantity, product.stock)
+        items.append(
+            CartItemResponse(
+                product_id=str(product.id),
+                name=product.name,
+                price=product.price,
+                image_url=product.image_url,
+                quantity=quantity,
+                stock=product.stock,
+            )
+        )
+        total += product.price * quantity
+
+    return CartResponse(items=items, total=round(total, 2), item_count=len(items))

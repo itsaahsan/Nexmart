@@ -8,10 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
+from models.cart import CartItem
 from models.order import Order, OrderItem
 from models.product import Product
 from models.user import User
-from redis_client import redis_client
 from schemas.order import OrderListResponse, OrderResponse, OrderStatusUpdate
 from utils.auth import get_current_user, get_current_admin
 from utils.stripe_utils import create_payment_intent
@@ -194,10 +194,12 @@ async def create_order(
         )
         db.add(order_item)
 
-    try:
-        await redis_client.delete(f"cart:{current_user.id}")
-    except Exception:
-        pass
+    # Clear cart from database
+    cart_result = await db.execute(
+        select(CartItem).where(CartItem.user_id == current_user.id)
+    )
+    for cart_item in cart_result.scalars().all():
+        await db.delete(cart_item)
     await db.flush()
 
     return OrderResponse(
