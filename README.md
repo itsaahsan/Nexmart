@@ -4,7 +4,7 @@ A modern e-commerce platform built with React, FastAPI, and PostgreSQL.
 
 ## Live Demo
 
-🔗 **Frontend**: https://nexmart-ecommerce.vercel.app  
+🔗 **Frontend**: https://nexmart-ecommerce-zeta.vercel.app  
 🔗 **Backend API**: https://nexmart-backend.vercel.app  
 📖 **API Docs (Swagger)**: https://nexmart-backend.vercel.app/docs  
 📋 **API Docs (ReDoc)**: https://nexmart-backend.vercel.app/redoc  
@@ -103,7 +103,7 @@ docker exec nexmart-backend-1 python -m pytest tests/ -v
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string (async format) |
 | `SECRET_KEY` | Yes | JWT signing secret (min 32 chars) |
-| `FRONTEND_URL` | Yes | `https://nexmart-ecommerce.vercel.app` |
+| `FRONTEND_URL` | Yes | `https://nexmart-ecommerce-zeta.vercel.app` |
 | `ENVIRONMENT` | Yes | `production` |
 | `STRIPE_SECRET_KEY` | No | Stripe secret key for payments |
 | `STRIPE_PUBLISHABLE_KEY` | No | Stripe publishable key |
