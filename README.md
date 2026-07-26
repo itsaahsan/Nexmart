@@ -4,10 +4,10 @@ A modern e-commerce platform built with React, FastAPI, and PostgreSQL.
 
 ## Live Demo
 
-🔗 **Frontend**: https://nexmart-ecommerce-zeta.vercel.app  
-🔗 **Backend API**: https://nexmart-backend.vercel.app  
-📖 **API Docs (Swagger)**: https://nexmart-backend.vercel.app/docs  
-📋 **API Docs (ReDoc)**: https://nexmart-backend.vercel.app/redoc  
+🔗 **Frontend**: https://nexmart-ecommerce-zeta.vercel.app
+🔗 **Backend API**: https://nexmart-backend.vercel.app
+📖 **API Docs (Swagger)**: https://nexmart-backend.vercel.app/docs
+📋 **API Docs (ReDoc)**: https://nexmart-backend.vercel.app/redoc
 💻 **Source Code**: https://github.com/itsaahsan/Nexmart
 
 ## Tech Stack
