@@ -17,7 +17,7 @@ A modern e-commerce platform built with React, FastAPI, and PostgreSQL.
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand, React Query |
 | Backend | FastAPI, SQLAlchemy (async), Pydantic v2 |
 | Database | PostgreSQL 15 (asyncpg pool: 20 + 30 overflow) |
-| Cache | Redis (pooled, 100 conns, 5m product TTL, 60s admin TTL, rate limiting) |
+| Cache | Redis, optional (pooled, 100 conns, 5m product TTL, 60s admin TTL, rate limiting; fails open without it) |
 | Payments | Stripe (PaymentIntents + webhooks, demo fallback) |
 | Image Upload | Cloudinary |
 | Auth | JWT (access + refresh) + RBAC (customer/support/manager/admin) |
@@ -183,14 +183,19 @@ stripe listen --forward-to localhost:8000/api/orders/webhook
 | POST | `/api/cart/add` | Yes | Add to cart |
 | PUT | `/api/cart/{product_id}` | Yes | Update quantity |
 | DELETE | `/api/cart/{product_id}` | Yes | Remove item |
+| DELETE | `/api/cart` | Yes | Clear cart |
+| POST | `/api/cart/merge` | Yes | Merge guest cart on login |
 | POST | `/api/orders/create-payment-intent` | Yes | Server-priced Stripe PaymentIntent |
 | POST | `/api/orders` | Yes | Create order (verifies intent amount) |
 | GET | `/api/orders` | Yes | List own orders |
+| GET | `/api/orders/{order_id}` | Yes | Get single order |
 | POST | `/api/orders/webhook` | No | Stripe webhook → order status updates |
 | GET | `/api/orders/config` | No | Publishable key + currency + demo flag |
 | POST | `/api/reviews` | Yes | Create review |
 | GET | `/api/wishlist` | Yes | Get wishlist |
 | POST | `/api/wishlist/{product_id}` | Yes | Add to wishlist |
+| GET | `/api/wishlist/check/{product_id}` | Yes | Check if wishlisted |
+| DELETE | `/api/wishlist/{product_id}` | Yes | Remove from wishlist |
 | GET | `/api/admin/dashboard` | Admin | Revenue, AOV, status mix, low stock, top products |
 | GET | `/api/admin/products` | Admin | Admin product list |
 | GET | `/api/admin/users` | Admin | Admin user list |
