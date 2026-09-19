@@ -59,12 +59,13 @@ PRODUCTS = [
 
 # --- Generated catalog: expands curated PRODUCTS to 500+ items ---
 # Deterministic generator so seeds are stable across runs/environments.
-# Every image URL below was verified reachable (HTTP 200) before being added.
-# Uniqueness: each generated product gets pool[idx % P] + variant[(idx // P) % V],
-# where idx is its sequence number within its category, so no two GEN products
-# in the same category share an image_url (needs P*V >= target_per_category).
+# Every image URL below was verified reachable (HTTP 200) AND visually checked
+# so the photo subject matches the product type exactly.
+# Uniqueness: within a type, photo[(idx//1) % k] + variant[(idx//k) % 13 + 1];
+# every type's count fits in k*13 slots, and photos are exclusive per type,
+# so no two products share an image_url (curated rows use bare URLs).
 _IMG_VARIANTS = [
-    "",  # original framing
+    "",  # original framing (index 0 never used for GEN; keeps GEN disjoint from curated)
     "&h=600&fit=crop&crop=entropy",
     "&h=600&fit=crop&crop=top",
     "&h=600&fit=crop&crop=bottom",
@@ -74,138 +75,149 @@ _IMG_VARIANTS = [
     "&h=600&fit=crop&crop=edges",
     "&h=600&fit=crop&flip=h",
     "&h=600&fit=crop&flip=v",
+    "&h=600&fit=crop&crop=top&flip=h",
+    "&h=600&fit=crop&crop=bottom&flip=h",
+    "&h=600&fit=crop&crop=left&flip=h",
+    "&h=600&fit=crop&crop=right&flip=h",
+    "&h=600&fit=crop&crop=faces&flip=h",
+    "&h=600&fit=crop&crop=edges&flip=h",
+    "&h=600&fit=crop&crop=entropy&flip=v",
+    "&h=600&fit=crop&crop=top&flip=v",
+    "&h=600&fit=crop&crop=bottom&flip=v",
+    "&h=600&fit=crop&crop=left&flip=v",
+    "&h=600&fit=crop&crop=right&flip=v",
+    "&h=600&fit=crop&crop=faces&flip=v",
+    "&h=600&fit=crop&crop=edges&flip=v",
 ]
+_VARIANT_SLOTS = len(_IMG_VARIANTS) - 1  # 21 usable (skip index 0)
+
+_U = "https://images.unsplash.com/{0}?w=600"
+
+# Exact-subject photo per product type (photo IDs visually verified).
+_TYPE_PHOTOS = {
+    "Electronics": {
+        "Headphones": ["photo-1505740420928-5e560c06d30e", "photo-1583394838336-acd977736f90", "photo-1498049794561-7780e7231661"],
+        "Smartwatch": ["photo-1523275335684-37898b6baf30", "photo-1434493789847-2f02dc6ca35d", "photo-1508685096489-7aacd43bd3b1"],
+        "Earbuds": ["photo-1606220588913-b3aacb4d2f46", "photo-1590658268037-6bf12165a8df", "photo-1606220945770-b5b6c2c55bf1"],
+        "Keyboard": ["photo-1587829741301-dc798b83add3", "photo-1550009158-9ebf69173e03"],
+        "Charger": ["photo-1601784551446-20c9e07cdbdb", "photo-1511707171634-5f897ff02aa9"],
+        "Speaker": ["photo-1608043152269-423dbba4e7e1"],
+        "Laptop Stand": ["photo-1527864550417-7fd91fc51a46"],
+        "Desk Lamp": ["photo-1534073737927-85f1ebff1f5d"],
+        "USB-C Hub": ["photo-1625842268584-8f3296236761"],
+        "Webcam": ["photo-1587826080692-f439cd0b70da"],
+        "Power Bank": ["photo-1609091839311-d5365f9ff1c5"],
+        "Laptop": ["photo-1593642632823-8f785ba67e45"],
+        "SSD Drive": ["photo-1518770660439-4636190af475"],
+        "Mouse": ["photo-1615663245857-ac93bb7c39e7"],
+    },
+    "Clothing": {
+        "T-Shirt": ["photo-1521572163474-6864f9cf17ab", "photo-1523381210434-271e8be1f52b", "photo-1576566588028-4147f3842f27", "photo-1618354691373-d851c5c3a990"],
+        "Sneakers": ["photo-1549298916-b41d501d3772", "photo-1560769629-975ec94e6a86", "photo-1595950653106-6c9ebd614d3a"],
+        "Jacket": ["photo-1551028719-00167b16eac5", "photo-1445205170230-053b83016050"],
+        "Hoodie": ["photo-1591047139829-d91aecb6caea", "photo-1620799140408-edc6dcb6d633"],
+        "Jeans": ["photo-1542272604-787c3835535d"],
+        "Cap": ["photo-1556306535-0f09a537f0a3"],
+        "Polo Shirt": ["photo-1596755094514-f87e34085b2c"],
+        "Backpack": ["photo-1548036328-c9fa89d128fa"],
+        "Overcoat": ["photo-1539533018447-63fcce2678e3"],
+        "Belt": ["photo-1624222247344-550fb60583dc"],
+        "Sunglasses": ["photo-1572635196237-14b3f281503f"],
+    },
+    "Home & Kitchen": {
+        "Pillow": ["photo-1631679706909-1844bbd07221", "photo-1567016432779-094069958ea5"],
+        "Lamp": ["photo-1507473885765-e6ed057f782c", "photo-1586023492125-27b2c045efd7"],
+        "Cookware Set": ["photo-1556909114-f6e7ad7d3136"],
+        "Plant Pot": ["photo-1485955900006-10f4d324d411"],
+        "Cutting Board": ["photo-1594226801341-41427b4e5c22"],
+        "Vacuum Cleaner": ["photo-1518611012118-696072aa579a"],
+        "Bed Sheet Set": ["photo-1522771739844-6a9f6d5f14af"],
+        "Frying Pan": ["photo-1585515320310-259814833e62"],
+        "Aromatherapy Diffuser": ["photo-1602928321679-560bb453f190"],
+        "Wall Shelf": ["photo-1595428774223-ef52624120d2"],
+    },
+    "Sports & Outdoors": {
+        "Yoga Mat": ["photo-1601925260368-ae2f83cf8b7f", "photo-1544367567-0f2fcb009e0b", "photo-1552196563-55cd4e45efb3"],
+        "Dumbbell Set": ["photo-1534438327276-14e5300c3a48", "photo-1541534741688-6078c6bfb5c5", "photo-1517836357463-d25dfeac3438"],
+        "Water Bottle": ["photo-1602143407151-7111542de6e8", "photo-1570831739435-6601aa3fa4fb"],
+        "Running Shoes": ["photo-1542291026-7eec264c27ff", "photo-1476480862126-209bfaa8edc8"],
+        "Tennis Racket": ["photo-1622279457486-62dcc4a431d6"],
+        "Backpack": ["photo-1553062407-98eeb64c6a62"],
+        "Tent": ["photo-1504280390367-361c6d9f38f4"],
+        "Resistance Bands": ["photo-1598289431512-b97b0917affc"],
+        "Cycling Helmet": ["photo-1517649763962-0c623066013b"],
+    },
+    "Books & Media": {
+        "Programming Guide": ["photo-1544947950-fa07a98d237f"],
+        "Sci-Fi Novel": ["photo-1495446815901-a7297e633e8d"],
+        "Art Book": ["photo-1481627834876-b7833e8f5570"],
+        "Mystery Box Set": ["photo-1507842217343-583bb7270b66"],
+        "History Atlas": ["photo-1512820790803-83ca734da794"],
+        "Poetry Collection": ["photo-1457369804613-52c61a468e7d"],
+        "Language Course": ["photo-1519682337058-a94d519337bc"],
+        "Record Player": ["photo-1539375665275-f9de415ef9ac"],
+        "Study Planner": ["photo-1499750310107-5fef28a66643"],
+    },
+}
 
 _GENERATOR_SPECS = {
     "Electronics": {
         "code": "ELEC",
         "brands": ["AudioMax", "TechFlow", "FitTech", "SoundWave", "KeyCraft", "ClearView", "ChargeMax", "LightPro"],
-        "types": ["Headphones", "Speaker", "Keyboard", "Monitor", "Charger", "Drone", "Camera", "Smartwatch", "Router", "SSD Drive", "Power Strip", "Microphone", "Tablet Stand", "VR Headset", "Dash Cam"],
+        "types": ["Headphones", "Smartwatch", "Earbuds", "Keyboard", "Charger", "Speaker", "Laptop Stand", "Desk Lamp", "USB-C Hub", "Webcam", "Power Bank", "Laptop", "SSD Drive", "Mouse"],
         "adjectives": ["Wireless", "Ultra", "Pro", "Elite", "Smart", "Compact", "Deluxe", "Turbo", "Nano", "Quantum"],
-        "images": [
-            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600",
-            "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=600",
-            "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600",
-            "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=600",
-            "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=600",
-            "https://images.unsplash.com/photo-1518770660439-4636190af475?w=600",
-            "https://images.unsplash.com/photo-1550009158-9ebf69173e03?w=600",
-            "https://images.unsplash.com/photo-1583394838336-acd977736f90?w=600",
-            "https://images.unsplash.com/photo-1593642632823-8f785ba67e45?w=600",
-            "https://images.unsplash.com/photo-1601784551446-20c9e07cdbdb?w=600",
-            "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=600",
-            "https://images.unsplash.com/photo-1434493789847-2f02dc6ca35d?w=600",
-            "https://images.unsplash.com/photo-1508685096489-7aacd43bd3b1?w=600",
-            "https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=600",
-            "https://images.unsplash.com/photo-1606220945770-b5b6c2c55bf1?w=600",
-            "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=600",
-        ],
         "price": (19.99, 399.99),
     },
     "Clothing": {
         "code": "CLTH",
         "brands": ["UrbanThread", "DenimCraft", "ActivePeak", "WoolCraft", "HeritageCo"],
-        "types": ["T-Shirt", "Jeans", "Jacket", "Hoodie", "Sneakers", "Cap", "Socks Pack", "Sweater", "Shorts", "Blazer", "Scarf", "Gloves", "Polo Shirt", "Cargo Pants", "Windbreaker"],
+        "types": ["T-Shirt", "Sneakers", "Jacket", "Hoodie", "Jeans", "Cap", "Polo Shirt", "Backpack", "Overcoat", "Belt", "Sunglasses"],
         "adjectives": ["Classic", "Slim Fit", "Premium", "Vintage", "Sport", "Organic", "Stretch", "Waterproof", "Lightweight", "Thermal"],
-        "images": [
-            "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600",
-            "https://images.unsplash.com/photo-1542272604-787c3835535d?w=600",
-            "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600",
-            "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600",
-            "https://images.unsplash.com/photo-1445205170230-053b83016050?w=600",
-            "https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=600",
-            "https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=600",
-            "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=600",
-            "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=600",
-            "https://images.unsplash.com/photo-1560769629-975ec94e6a86?w=600",
-            "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=600",
-            "https://images.unsplash.com/photo-1620799140408-edc6dcb6d633?w=600",
-            "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=600",
-            "https://images.unsplash.com/photo-1556306535-0f09a537f0a3?w=600",
-        ],
         "price": (14.99, 249.99),
     },
     "Home & Kitchen": {
         "code": "HOME",
         "brands": ["ChefElite", "SleepWell", "GreenThumb", "EcoKitchen", "CleanBot"],
-        "types": ["Cookware Set", "Pillow", "Plant Pot", "Cutting Board", "Lamp", "Vacuum", "Bed Sheet", "Kettle", "Blender", "Storage Box", "Candle Set", "Towel Set", "Air Fryer", "Coffee Maker", "Wall Shelf"],
+        "types": ["Pillow", "Lamp", "Cookware Set", "Plant Pot", "Cutting Board", "Vacuum Cleaner", "Bed Sheet Set", "Frying Pan", "Aromatherapy Diffuser", "Wall Shelf"],
         "adjectives": ["Premium", "Eco", "Deluxe", "Compact", "Ceramic", "Bamboo", "Smart", "Non-Stick", "Insulated", "Minimalist"],
-        "images": [
-            "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600",
-            "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=600",
-            "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=600",
-            "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600",
-            "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=600",
-            "https://images.unsplash.com/photo-1567016432779-094069958ea5?w=600",
-            "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=600",
-            "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=600",
-            "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600",
-            "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=600",
-            "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=600",
-            "https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=600",
-        ],
         "price": (12.99, 349.99),
     },
     "Sports & Outdoors": {
         "code": "SPRT",
         "brands": ["ProSport", "ZenFlow", "TrailMaster", "HydroKeep", "SpeedStep"],
-        "types": ["Tennis Racket", "Yoga Mat", "Backpack", "Water Bottle", "Running Shoes", "Tent", "Resistance Bands", "Dumbbell Set", "Cycling Helmet", "Fishing Rod", "Sleeping Bag", "Trekking Poles", "Cooler Box", "Gym Bag", "Jump Rope"],
+        "types": ["Yoga Mat", "Dumbbell Set", "Water Bottle", "Running Shoes", "Tennis Racket", "Backpack", "Tent", "Resistance Bands", "Cycling Helmet"],
         "adjectives": ["Pro", "Ultralight", "Insulated", "Carbon", "Waterproof", "Extra Thick", "Durable", "Lightweight", "Thermal", "Compression"],
-        "images": [
-            "https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600",
-            "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600",
-            "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600",
-            "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600",
-            "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=600",
-            "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=600",
-            "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=600",
-            "https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?w=600",
-            "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=600",
-            "https://images.unsplash.com/photo-1530549387789-4c1017266635?w=600",
-            "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=600",
-            "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?w=600",
-        ],
         "price": (9.99, 299.99),
     },
     "Books & Media": {
         "code": "BOOK",
         "brands": ["TechPress", "RetroSound", "StarLit Press", "PageTurner", "MediaHub"],
-        "types": ["Programming Guide", "Sci-Fi Novel", "Record Player", "E-Reader Case", "Documentary DVD Set", "Art Book", "Language Course", "Podcast Mic", "Photo Album", "Board Game", "Mystery Box Set", "History Atlas", "Poetry Collection", "Vinyl Storage Crate", "Study Planner"],
+        "types": ["Programming Guide", "Sci-Fi Novel", "Art Book", "Mystery Box Set", "History Atlas", "Poetry Collection", "Language Course", "Record Player", "Study Planner"],
         "adjectives": ["Complete", "Deluxe", "Illustrated", "Bestselling", "Collector's", "Ultimate", "Essential", "Limited", "Classic", "Modern"],
-        "images": [
-            "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600",
-            "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=600",
-            "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=600",
-            "https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600",
-            "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=600",
-            "https://images.unsplash.com/photo-1507842217343-583bb7270b66?w=600",
-            "https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600",
-            "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=600",
-            "https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=600",
-            "https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=600",
-            "https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=600",
-            "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600",
-            "https://images.unsplash.com/photo-1520523839897-bd0b52f945a0?w=600",
-        ],
         "price": (9.99, 199.99),
     },
 }
 
 
 def _build_full_catalog(target_per_category: int = 110):
-    """Return curated PRODUCTS plus deterministic generated items (>=500 total)."""
+    """Return curated PRODUCTS plus deterministic generated items (>=500 total).
+
+    Image rule: each product's photo depicts its type exactly (visually
+    verified mapping in _TYPE_PHOTOS). Uniqueness comes from per-type photo
+    rotation x crop variants; every type's count fits its k*13 slots and
+    photos are exclusive per type, so image_urls are globally unique.
+    """
     import hashlib
 
     full = [dict(p) for p in PRODUCTS]
     existing_skus = {p["sku"] for p in full}
-    gen_index = {cat: 0 for cat in _GENERATOR_SPECS}
+    type_seq: dict[tuple[str, str], int] = {}
 
     for cat_name, spec in _GENERATOR_SPECS.items():
         made = sum(1 for p in full if p.get("category") == cat_name)
         need = max(0, target_per_category - made)
         lo, hi = spec["price"]
-        pool = spec["images"]
-        n_variants = len(_IMG_VARIANTS)
+        type_photos = _TYPE_PHOTOS[cat_name]
         for i in range(need):
             n = len([p for p in full if p.get("category") == cat_name])
             adj = spec["adjectives"][i % len(spec["adjectives"])]
@@ -223,11 +235,11 @@ def _build_full_catalog(target_per_category: int = 110):
             h = int(hashlib.md5(f"{cat_name}:{name}".encode()).hexdigest()[:8], 16)
             price = round(lo + (h % int((hi - lo) * 100)) / 100, 2)
             brand = spec["brands"][h % len(spec["brands"])]
-            # Unique image per generated product: sequence-based photo+variant pick.
-            # Variants start at index 1 so GEN urls never equal curated bare URLs.
-            idx = gen_index[cat_name]
-            gen_index[cat_name] = idx + 1
-            img = pool[idx % len(pool)] + _IMG_VARIANTS[((idx // len(pool)) % (n_variants - 1)) + 1]
+            # Subject-exact photo for this type; per-type sequence -> unique URL
+            photos = type_photos[typ]
+            t_idx = type_seq.get((cat_name, typ), 0)
+            type_seq[(cat_name, typ)] = t_idx + 1
+            img = _U.format(photos[t_idx % len(photos)]) + _IMG_VARIANTS[((t_idx // len(photos)) % _VARIANT_SLOTS) + 1]
             sku = f"{spec['code']}-GEN-{n + 1:04d}"
             while sku in existing_skus:
                 n += 1
@@ -344,32 +356,50 @@ async def seed():
 
         catalog = _build_full_catalog(target_per_category=110)
 
-        # Backfill: reconcile image_url/images for existing GEN rows so older
-        # seeds pick up the expanded unique-image pools (idempotent, 1 SELECT).
+        # Backfill: reconcile name/description/brand/image for existing GEN rows
+        # (type renames + subject-exact photos). Slugs, prices, stock and
+        # ratings are left untouched. Idempotent, 1 SELECT + batched UPDATEs.
         desired = {
-            p["sku"]: p["image_url"] for p in catalog if "-GEN-" in p["sku"]
+            p["sku"]: p for p in catalog if "-GEN-" in p["sku"]
         }
         if desired:
             existing_rows = (
                 await db.execute(
-                    select(Product.sku, Product.image_url).where(
-                        Product.sku.in_(list(desired))
-                    )
+                    select(
+                        Product.sku,
+                        Product.name,
+                        Product.description,
+                        Product.brand,
+                        Product.image_url,
+                    ).where(Product.sku.in_(list(desired)))
                 )
             ).all()
             mismatch_skus = [
-                sku for sku, img in existing_rows if img != desired.get(sku)
+                sku
+                for sku, name, desc, brand, img in existing_rows
+                if (
+                    img != desired[sku]["image_url"]
+                    or name != desired[sku]["name"]
+                    or brand != desired[sku]["brand"]
+                )
             ]
             for i in range(0, len(mismatch_skus), 100):
                 batch = mismatch_skus[i : i + 100]
                 for sku in batch:
+                    want = desired[sku]
                     await db.execute(
                         sa_update(Product)
                         .where(Product.sku == sku)
-                        .values(image_url=desired[sku], images=[desired[sku]])
+                        .values(
+                            name=want["name"],
+                            description=want["description"],
+                            brand=want["brand"],
+                            image_url=want["image_url"],
+                            images=[want["image_url"]],
+                        )
                     )
             if mismatch_skus:
-                print(f"Backfilled images for {len(mismatch_skus)} products")
+                print(f"Backfilled {len(mismatch_skus)} products (name+image match)")
         await db.flush()
 
         # Skip only when we already have a full 500+ catalog with nothing missing

@@ -14,7 +14,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Nexmart", version="1.0.0")
 app.state.limiter = limiter
 app.state.db_ready = False
-APP_REVISION = "a46c5c3-bulk-dedup"  # bump on each deploy to verify live code
+APP_REVISION = "name-image-match"  # bump on each deploy to verify live code
 
 
 @app.get("/")
