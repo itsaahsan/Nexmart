@@ -117,7 +117,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(User).order_by(User.created_at.desc()).offset((page - 1) * limit).limit(limit)
+        select(User).order_by(User.created_at.desc(), User.id.asc()).offset((page - 1) * limit).limit(limit)
     )
     users = result.scalars().all()
     return [UserResponse.model_validate(u) for u in users]
@@ -177,7 +177,7 @@ async def admin_list_orders(
     pages = math.ceil(total / limit) if total > 0 else 1
 
     result = await db.execute(
-        query.order_by(Order.created_at.desc()).offset((page - 1) * limit).limit(limit)
+        query.order_by(Order.created_at.desc(), Order.id.asc()).offset((page - 1) * limit).limit(limit)
     )
     orders = result.scalars().all()
 
@@ -259,7 +259,7 @@ async def admin_list_products(
     pages = math.ceil(total / limit) if total > 0 else 1
 
     result = await db.execute(
-        select(Product).order_by(Product.created_at.desc()).offset((page - 1) * limit).limit(limit)
+        select(Product).order_by(Product.created_at.desc(), Product.id.asc()).offset((page - 1) * limit).limit(limit)
     )
     products = result.scalars().all()
 

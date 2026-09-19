@@ -55,7 +55,7 @@ async def list_orders(
     total = total_result.scalar() or 0
     pages = math.ceil(total / limit) if total > 0 else 1
 
-    query = query.options(selectinload(Order.items)).order_by(Order.created_at.desc())
+    query = query.options(selectinload(Order.items)).order_by(Order.created_at.desc(), Order.id.asc())
     query = query.offset((page - 1) * limit).limit(limit)
 
     result = await db.execute(query)

@@ -88,7 +88,7 @@ async def list_products(
         "rating": Product.rating.desc(),
         "popular": Product.review_count.desc(),
     }
-    query = query.order_by(sort_map.get(sort, Product.created_at.desc()))
+    query = query.order_by(sort_map.get(sort, Product.created_at.desc()), Product.id.asc())
 
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
