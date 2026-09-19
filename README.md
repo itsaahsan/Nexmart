@@ -145,9 +145,9 @@ stripe listen --forward-to localhost:8000/api/orders/webhook
 | `FRONTEND_URL` | Yes | `https://nexmart-ecommerce-zeta.vercel.app` |
 | `ENVIRONMENT` | Yes | `production` |
 | `REDIS_URL` | No | Redis URL for product caching + rate limiting (app runs without it) |
-| `STRIPE_SECRET_KEY` | No | Stripe secret key for payments |
-| `STRIPE_PUBLISHABLE_KEY` | No | Stripe publishable key |
-| `STRIPE_WEBHOOK_SECRET` | No | Webhook signing secret (enables signature-verified order updates) |
+| `STRIPE_SECRET_KEY` | For real payments | Stripe secret key (without it: demo mode) |
+| `STRIPE_PUBLISHABLE_KEY` | For real payments | Stripe publishable key (without it: demo mode) |
+| `STRIPE_WEBHOOK_SECRET` | For real payments | Webhook signing secret (without it: unsigned demo events only) |
 | `STRIPE_CURRENCY` | No | Currency code, default `usd` |
 | `CLOUDINARY_CLOUD_NAME` | No | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | No | Cloudinary API key |
