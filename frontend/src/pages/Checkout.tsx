@@ -39,11 +39,11 @@ export default function Checkout() {
   const handlePayment = async () => {
     setProcessing(true)
     try {
-      await ordersApi.createPaymentIntent(cart.items)
-      await ordersApi.create(shippingAddress, 'pi_demo', cart.items)
+      const intent = await ordersApi.createPaymentIntent(cart.items)
+      await ordersApi.create(shippingAddress, intent.payment_intent_id, cart.items)
       clearCart()
       navigate('/order-confirmation')
-      toast.success('Order placed successfully!')
+      toast.success(intent.demo_mode ? 'Order placed successfully! (demo mode)' : 'Order placed successfully!')
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       if (msg && msg.includes('not found')) {

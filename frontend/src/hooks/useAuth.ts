@@ -27,7 +27,7 @@ export const useAuth = () => {
     mutationFn: authApi.login,
     onSuccess: (data) => {
       const placeholderUser = {
-        id: '', email: '', full_name: '', is_admin: false, is_verified: false, created_at: ''
+        id: '', email: '', full_name: '', role: 'customer' as const, is_admin: false, is_verified: false, created_at: ''
       }
       login(placeholderUser, data.access_token, data.refresh_token)
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
@@ -38,7 +38,7 @@ export const useAuth = () => {
     mutationFn: authApi.register,
     onSuccess: (data) => {
       const placeholderUser = {
-        id: '', email: '', full_name: '', is_admin: false, is_verified: false, created_at: ''
+        id: '', email: '', full_name: '', role: 'customer' as const, is_admin: false, is_verified: false, created_at: ''
       }
       login(placeholderUser, data.access_token, data.refresh_token)
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })

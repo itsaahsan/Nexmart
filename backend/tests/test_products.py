@@ -7,7 +7,9 @@ from httpx import AsyncClient
 async def test_health(client: AsyncClient):
     response = await client.get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "db_ready" in data
 
 
 @pytest.mark.asyncio

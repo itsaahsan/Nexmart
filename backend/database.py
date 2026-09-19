@@ -30,10 +30,24 @@ def _normalize_database_url(url: str) -> str:
     return url
 
 
-engine = create_async_engine(
-    _normalize_database_url(settings.DATABASE_URL),
-    echo=False,
-    pool_pre_ping=True,
+engine = (
+    create_async_engine(
+        _normalize_database_url(settings.DATABASE_URL),
+        echo=False,
+        pool_pre_ping=True,
+        # Sized for 1,000+ concurrent users behind caching + pagination.
+        # asyncpg pool: 20 persistent + 30 overflow, recycle hourly.
+        pool_size=20,
+        max_overflow=30,
+        pool_timeout=30,
+        pool_recycle=3600,
+    )
+    if not _normalize_database_url(settings.DATABASE_URL).startswith("sqlite")
+    else create_async_engine(
+        _normalize_database_url(settings.DATABASE_URL),
+        echo=False,
+        pool_pre_ping=True,
+    )
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

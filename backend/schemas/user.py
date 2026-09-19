@@ -23,6 +23,7 @@ class UserUpdate(BaseModel):
 class UserResponse(UserBase):
     id: UUID
     avatar_url: str | None = None
+    role: str = "customer"
     is_admin: bool = False
     is_verified: bool = False
     created_at: datetime
@@ -37,5 +38,6 @@ class ChangePassword(BaseModel):
 
 
 class AdminUserUpdate(BaseModel):
+    role: str | None = None
     is_admin: bool | None = None
     is_verified: bool | None = None

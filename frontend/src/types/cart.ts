@@ -66,7 +66,12 @@ export interface DashboardStats {
   total_products: number
   total_orders: number
   total_revenue: number
+  avg_order_value?: number
   pending_orders: number
+  orders_by_status?: Record<string, number>
+  products_by_category?: Record<string, number>
+  low_stock_products?: { id: string; name: string; stock: number; sku: string }[]
+  out_of_stock_count?: number
   recent_orders: {
     id: string
     total: number

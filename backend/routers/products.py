@@ -113,12 +113,18 @@ async def list_products(
 async def search_suggestions(q: str = "", db: AsyncSession = Depends(get_db)):
     if not q or len(q) < 2:
         return []
+    cache_key = f"products:suggest:{q.lower()[:32]}"
+    cached = await cache_get(cache_key)
+    if cached is not None:
+        return cached
     result = await db.execute(
         select(Product.name)
         .where(Product.is_active == True, Product.name.ilike(f"%{q}%"))
         .limit(8)
     )
-    return [r[0] for r in result.all()]
+    data = [r[0] for r in result.all()]
+    await cache_set(cache_key, data, ttl=300)
+    return data
 
 
 @router.get("/featured", response_model=list[ProductResponse])
@@ -191,6 +197,7 @@ async def create_product(
     db.add(product)
     await db.flush()
     await cache_delete_pattern("products:*")
+    await cache_delete("admin:dashboard")
     return ProductResponse.model_validate(product).model_dump()
 
 
@@ -220,6 +227,7 @@ async def update_product(
     await db.flush()
     await cache_delete(f"product:{product_id}")
     await cache_delete_pattern("products:*")
+    await cache_delete("admin:dashboard")
     return ProductResponse.model_validate(product).model_dump()
 
 
@@ -239,6 +247,7 @@ async def delete_product(product_id: str, db: AsyncSession = Depends(get_db)):
     await db.flush()
     await cache_delete(f"product:{product_id}")
     await cache_delete_pattern("products:*")
+    await cache_delete("admin:dashboard")
     return {"message": "Product deleted"}
 
 

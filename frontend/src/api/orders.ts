@@ -15,7 +15,7 @@ export const ordersApi = {
     return response.data
   },
 
-  createPaymentIntent: async (items: CartItem[]): Promise<{ client_secret: string; amount: number }> => {
+  createPaymentIntent: async (items: CartItem[]): Promise<{ client_secret: string; amount: number; payment_intent_id: string; demo_mode: boolean }> => {
     const response = await api.post('/api/orders/create-payment-intent', {
       shipping_address: {},
       items: items.map((i) => ({
@@ -32,6 +32,7 @@ export const ordersApi = {
   create: async (shippingAddress: Record<string, string>, _paymentIntentId: string, items: CartItem[]): Promise<Order> => {
     const response = await api.post('/api/orders', {
       shipping_address: shippingAddress,
+      payment_intent_id: _paymentIntentId,
       items: items.map((i) => ({
         product_id: i.product_id,
         name: i.name,

@@ -10,6 +10,7 @@ from database import get_db
 from models.order import Order, OrderItem
 from models.product import Product
 from models.user import User
+from redis_client import cache_delete, cache_get, cache_set
 from schemas.order import OrderListResponse, OrderResponse, OrderStatusUpdate
 from schemas.product import ProductListResponse, ProductResponse
 from schemas.user import AdminUserUpdate, UserResponse
@@ -30,6 +31,10 @@ async def dashboard_stats(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    cached = await cache_get("admin:dashboard")
+    if cached:
+        return cached
+
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     total_products = (await db.execute(select(func.count(Product.id)))).scalar() or 0
     total_orders = (await db.execute(select(func.count(Order.id)))).scalar() or 0
@@ -71,15 +76,37 @@ async def dashboard_stats(
         for p in top_products
     ]
 
-    return {
+    # Extra analytics (SQLite + Postgres compatible: aggregate in Python/SQL basics)
+    status_rows = (await db.execute(select(Order.status, func.count(Order.id)).group_by(Order.status))).all()
+    orders_by_status = {status: count for status, count in status_rows}
+
+    low_stock_rows = (await db.execute(
+        select(Product).where(Product.stock <= 10).order_by(Product.stock.asc()).limit(10)
+    )).scalars().all()
+    low_stock = [{"id": str(p.id), "name": p.name, "stock": p.stock, "sku": p.sku} for p in low_stock_rows]
+    out_of_stock = (await db.execute(select(func.count(Product.id)).where(Product.stock <= 0))).scalar() or 0
+
+    category_rows = (await db.execute(select(Product.category, func.count(Product.id)).group_by(Product.category))).all()
+    products_by_category = {cat: count for cat, count in category_rows}
+
+    avg_order_value = round(float(total_revenue) / total_orders, 2) if total_orders else 0.0
+
+    payload = {
         "total_users": total_users,
         "total_products": total_products,
         "total_orders": total_orders,
         "total_revenue": total_revenue,
+        "avg_order_value": avg_order_value,
         "pending_orders": pending_orders,
+        "orders_by_status": orders_by_status,
+        "products_by_category": products_by_category,
+        "low_stock_products": low_stock,
+        "out_of_stock_count": out_of_stock,
         "recent_orders": recent,
         "top_products": top,
     }
+    await cache_set("admin:dashboard", payload, ttl=60)
+    return payload
 
 
 @router.get("/users", response_model=list[UserResponse])
@@ -103,6 +130,8 @@ async def update_user(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    from utils.auth import normalize_role
+
     try:
         uid = uuid.UUID(user_id)
     except ValueError:
@@ -113,8 +142,14 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if data.role is not None:
+        user.role = normalize_role(data.role)
+        # Keep legacy flag in sync
+        user.is_admin = (user.role == "admin")
     if data.is_admin is not None:
         user.is_admin = data.is_admin
+        if data.role is None:
+            user.role = "admin" if data.is_admin else "customer"
     if data.is_verified is not None:
         user.is_verified = data.is_verified
 
@@ -175,6 +210,7 @@ async def admin_list_orders(
                 tax=order.tax,
                 status=order.status,
                 stripe_payment_id=order.stripe_payment_id,
+                stripe_payment_status=order.stripe_payment_status,
                 shipping_address=order.shipping_address,
                 items=item_list,
                 created_at=order.created_at,
@@ -207,6 +243,7 @@ async def update_order_status(
 
     order.status = data.status
     await db.flush()
+    await cache_delete("admin:dashboard")
     return {"message": f"Order status updated to {data.status}"}
 
 

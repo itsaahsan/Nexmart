@@ -24,6 +24,7 @@ class OrderResponse(BaseModel):
     tax: float
     status: str
     stripe_payment_id: str | None = None
+    stripe_payment_status: str | None = None
     shipping_address: dict | None = None
     items: list[OrderItemResponse] = []
     created_at: datetime

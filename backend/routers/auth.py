@@ -36,11 +36,13 @@ async def register(data: AuthRegister, db: AsyncSession = Depends(get_db)):
         email=data.email,
         hashed_password=get_password_hash(data.password),
         full_name=data.full_name,
+        role="customer",
+        is_admin=False,
     )
     db.add(user)
     await db.flush()
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    access_token = create_access_token(data={"sub": str(user.id), "role": "customer"})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
@@ -48,12 +50,15 @@ async def register(data: AuthRegister, db: AsyncSession = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 async def login(data: AuthLogin, db: AsyncSession = Depends(get_db)):
+    from utils.auth import user_role
+
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    role = user_role(user)
+    access_token = create_access_token(data={"sub": str(user.id), "role": role})
     refresh_token = create_refresh_token(data={"sub": str(user.id)})
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
@@ -80,7 +85,10 @@ async def refresh_token(data: RefreshTokenRequest, db: AsyncSession = Depends(ge
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    from utils.auth import user_role
+
+    role = user_role(user)
+    access_token = create_access_token(data={"sub": str(user.id), "role": role})
     refresh_token_new = create_refresh_token(data={"sub": str(user.id)})
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_token_new)

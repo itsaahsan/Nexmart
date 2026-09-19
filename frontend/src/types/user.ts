@@ -4,6 +4,7 @@ export interface User {
   full_name: string
   phone?: string
   avatar_url?: string
+  role: 'customer' | 'support' | 'manager' | 'admin'
   is_admin: boolean
   is_verified: boolean
   created_at: string

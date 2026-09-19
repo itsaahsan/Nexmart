@@ -16,23 +16,34 @@ A modern e-commerce platform built with React, FastAPI, and PostgreSQL.
 |-------|-----------|
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS, Zustand, React Query |
 | Backend | FastAPI, SQLAlchemy (async), Pydantic v2 |
-| Database | PostgreSQL 15 |
-| Payments | Stripe (test mode) |
+| Database | PostgreSQL 15 (asyncpg pool: 20 + 30 overflow) |
+| Cache | Redis (pooled, 100 conns, 5m product TTL, 60s admin TTL, rate limiting) |
+| Payments | Stripe (PaymentIntents + webhooks, demo fallback) |
 | Image Upload | Cloudinary |
-| Auth | JWT (access + refresh tokens) |
+| Auth | JWT (access + refresh) + RBAC (customer/support/manager/admin) |
 
 ## Features
 
-- Product browsing with search, filters, and sorting
+- 550+ product catalog with search, filters, sorting, and pagination
 - Shopping cart with database persistence
-- User authentication (register / login / JWT)
-- Checkout with Stripe integration
+- JWT auth with refresh + role-based access control
+- Checkout with real Stripe PaymentIntents and webhook-driven order updates
 - Order history and tracking
 - Wishlist and product comparison
-- Admin dashboard (products, orders, users, categories)
+- Admin analytics (revenue, AOV, orders by status, low stock, top products)
+- Redis caching for products/categories/admin + per-IP rate limiting
 - Responsive design
 - Image error fallbacks
 - Auto-clearing stale cart items
+
+## Stripe webhooks
+
+1. Set `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` (see `backend/.env.example`).
+2. Expose backend publicly, then in Stripe Dashboard add endpoint:
+   `https://<backend>/api/orders/webhook`
+   Events: `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`, `checkout.session.completed`.
+3. Without keys the API runs in demo mode (`demo_mode: true`, `pi_demo_*`) and the same webhook route accepts unsigned demo events for local testing.
+4. Flow: `POST /api/orders/create-payment-intent` (server-priced) -> Stripe confirm -> `POST /api/orders` with `payment_intent_id` -> webhook transitions `pending -> processing/cancelled`.
 
 ## Project Structure
 

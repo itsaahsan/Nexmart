@@ -14,6 +14,62 @@ from settings import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
+# --- RBAC: roles & permissions ---
+# Roles are hierarchical: admin > manager > support > customer.
+# `is_admin` is kept for backward compatibility and mirrors role == "admin".
+VALID_ROLES = ("customer", "support", "manager", "admin")
+
+ROLE_PERMISSIONS: dict[str, set[str]] = {
+    "customer": {"cart:write", "order:create", "order:read-own", "wishlist:write", "review:write"},
+    "support": {"cart:write", "order:create", "order:read-own", "wishlist:write", "review:write", "order:read-all", "user:read"},
+    "manager": {"cart:write", "order:create", "order:read-own", "wishlist:write", "review:write", "order:read-all", "order:update-status", "product:write", "category:write", "user:read"},
+    "admin": {"*"},
+}
+
+
+def normalize_role(role: str | None) -> str:
+    role = (role or "customer").lower().strip()
+    return role if role in VALID_ROLES else "customer"
+
+
+def user_role(user: User) -> str:
+    # Prefer explicit role column; fall back to legacy is_admin flag.
+    role = getattr(user, "role", None) or ("admin" if getattr(user, "is_admin", False) else "customer")
+    return normalize_role(role)
+
+
+def has_permission(user: User, permission: str) -> bool:
+    role = user_role(user)
+    perms = ROLE_PERMISSIONS.get(role, set())
+    return "*" in perms or permission in perms
+
+
+def require_role(*allowed_roles: str):
+    allowed = {normalize_role(r) for r in allowed_roles}
+
+    async def _dep(current_user: User = Depends(get_current_user)) -> User:
+        if user_role(current_user) not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires role: {', '.join(sorted(allowed))}",
+            )
+        return current_user
+
+    return _dep
+
+
+def require_permission(*permissions: str):
+    async def _dep(current_user: User = Depends(get_current_user)) -> User:
+        missing = [p for p in permissions if not has_permission(current_user, p)]
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing permissions: {', '.join(missing)}",
+            )
+        return current_user
+
+    return _dep
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(
@@ -33,6 +89,9 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire, "type": "access"})
+    # Carry role for stateless frontend guards (DB remains source of truth).
+    if "role" not in to_encode:
+        to_encode["role"] = "customer"
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -70,9 +129,14 @@ async def get_current_user(
 async def get_current_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    if not current_user.is_admin:
+    if user_role(current_user) != "admin" and not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not enough permissions",
         )
     return current_user
+
+
+# Convenience aliases for route protection
+require_admin = require_role("admin")
+require_manager = require_role("admin", "manager")

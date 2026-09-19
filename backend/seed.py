@@ -57,19 +57,140 @@ PRODUCTS = [
 ]
 
 
+# --- Generated catalog: expands curated PRODUCTS to 500+ items ---
+# Deterministic generator so seeds are stable across runs/environments.
+_GENERATOR_SPECS = {
+    "Electronics": {
+        "code": "ELEC",
+        "brands": ["AudioMax", "TechFlow", "FitTech", "SoundWave", "KeyCraft", "ClearView", "ChargeMax", "LightPro"],
+        "types": ["Headphones", "Speaker", "Keyboard", "Monitor", "Charger", "Drone", "Camera", "Smartwatch", "Router", "SSD Drive", "Power Strip", "Microphone", "Tablet Stand", "VR Headset", "Dash Cam"],
+        "adjectives": ["Wireless", "Ultra", "Pro", "Elite", "Smart", "Compact", "Deluxe", "Turbo", "Nano", "Quantum"],
+        "images": [
+            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600",
+            "https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=600",
+            "https://images.unsplash.com/photo-1587829741301-dc798b83add3?w=600",
+            "https://images.unsplash.com/photo-1609091839311-d5365f9ff1c5?w=600",
+        ],
+        "price": (19.99, 399.99),
+    },
+    "Clothing": {
+        "code": "CLTH",
+        "brands": ["UrbanThread", "DenimCraft", "ActivePeak", "WoolCraft", "HeritageCo"],
+        "types": ["T-Shirt", "Jeans", "Jacket", "Hoodie", "Sneakers", "Cap", "Socks Pack", "Sweater", "Shorts", "Blazer", "Scarf", "Gloves", "Polo Shirt", "Cargo Pants", "Windbreaker"],
+        "adjectives": ["Classic", "Slim Fit", "Premium", "Vintage", "Sport", "Organic", "Stretch", "Waterproof", "Lightweight", "Thermal"],
+        "images": [
+            "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600",
+            "https://images.unsplash.com/photo-1542272604-787c3835535d?w=600",
+            "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600",
+            "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600",
+        ],
+        "price": (14.99, 249.99),
+    },
+    "Home & Kitchen": {
+        "code": "HOME",
+        "brands": ["ChefElite", "SleepWell", "GreenThumb", "EcoKitchen", "CleanBot"],
+        "types": ["Cookware Set", "Pillow", "Plant Pot", "Cutting Board", "Lamp", "Vacuum", "Bed Sheet", "Kettle", "Blender", "Storage Box", "Candle Set", "Towel Set", "Air Fryer", "Coffee Maker", "Wall Shelf"],
+        "adjectives": ["Premium", "Eco", "Deluxe", "Compact", "Ceramic", "Bamboo", "Smart", "Non-Stick", "Insulated", "Minimalist"],
+        "images": [
+            "https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=600",
+            "https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=600",
+            "https://images.unsplash.com/photo-1485955900006-10f4d324d411?w=600",
+            "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600",
+        ],
+        "price": (12.99, 349.99),
+    },
+    "Sports & Outdoors": {
+        "code": "SPRT",
+        "brands": ["ProSport", "ZenFlow", "TrailMaster", "HydroKeep", "SpeedStep"],
+        "types": ["Tennis Racket", "Yoga Mat", "Backpack", "Water Bottle", "Running Shoes", "Tent", "Resistance Bands", "Dumbbell Set", "Cycling Helmet", "Fishing Rod", "Sleeping Bag", "Trekking Poles", "Cooler Box", "Gym Bag", "Jump Rope"],
+        "adjectives": ["Pro", "Ultralight", "Insulated", "Carbon", "Waterproof", "Extra Thick", "Durable", "Lightweight", "Thermal", "Compression"],
+        "images": [
+            "https://images.unsplash.com/photo-1461896836934-bd45ba8fcf9b?w=600",
+            "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=600",
+            "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600",
+            "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=600",
+        ],
+        "price": (9.99, 299.99),
+    },
+    "Books & Media": {
+        "code": "BOOK",
+        "brands": ["TechPress", "RetroSound", "StarLit Press", "PageTurner", "MediaHub"],
+        "types": ["Programming Guide", "Sci-Fi Novel", "Record Player", "E-Reader Case", "Documentary DVD Set", "Art Book", "Language Course", "Podcast Mic", "Photo Album", "Board Game", "Mystery Box Set", "History Atlas", "Poetry Collection", "Vinyl Storage Crate", "Study Planner"],
+        "adjectives": ["Complete", "Deluxe", "Illustrated", "Bestselling", "Collector's", "Ultimate", "Essential", "Limited", "Classic", "Modern"],
+        "images": [
+            "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=600",
+            "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=600",
+            "https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=600",
+            "https://images.unsplash.com/photo-1539375665275-f9de415ef9ac?w=600",
+        ],
+        "price": (9.99, 199.99),
+    },
+}
+
+
+def _build_full_catalog(target_per_category: int = 110):
+    """Return curated PRODUCTS plus deterministic generated items (>=500 total)."""
+    import hashlib
+
+    full = [dict(p) for p in PRODUCTS]
+    existing_skus = {p["sku"] for p in full}
+
+    for cat_name, spec in _GENERATOR_SPECS.items():
+        made = sum(1 for p in full if p.get("category") == cat_name)
+        need = max(0, target_per_category - made)
+        lo, hi = spec["price"]
+        for i in range(need):
+            n = len([p for p in full if p.get("category") == cat_name])
+            adj = spec["adjectives"][i % len(spec["adjectives"])]
+            typ = spec["types"][(i // len(spec["adjectives"])) % len(spec["types"])]
+            series = (i // (len(spec["adjectives"]) * len(spec["types"]))) + 1
+            name = f"{adj} {typ} Series {series:02d}"
+            # Ensure unique name if collision with curated items
+            suffix = 0
+            candidate = name
+            existing_names = {p["name"] for p in full}
+            while candidate in existing_names:
+                suffix += 1
+                candidate = f"{name} Mk{suffix}"
+            name = candidate
+            h = int(hashlib.md5(f"{cat_name}:{name}".encode()).hexdigest()[:8], 16)
+            price = round(lo + (h % int((hi - lo) * 100)) / 100, 2)
+            brand = spec["brands"][h % len(spec["brands"])]
+            img = spec["images"][h % len(spec["images"])]
+            sku = f"{spec['code']}-GEN-{n + 1:04d}"
+            while sku in existing_skus:
+                n += 1
+                sku = f"{spec['code']}-GEN-{n + 1:04d}"
+            existing_skus.add(sku)
+            full.append({
+                "name": name,
+                "description": f"{name} in {cat_name}. Quality {brand} craftsmanship with durable materials and modern design. Ideal for everyday use.",
+                "price": price,
+                "compare_price": round(price * 1.25, 2) if h % 4 == 0 else None,
+                "category": cat_name,
+                "brand": brand,
+                "stock": 10 + (h % 190),
+                "sku": sku,
+                "is_featured": (h % 12 == 0),
+                "image_url": img,
+                "images": [img],
+            })
+    return full
+
+
 async def seed():
     await init_db()
     async with async_session() as db:
-        existing = await db.execute(select(User).limit(1))
-        if existing.scalar_one_or_none():
-            print("Database already seeded")
-            return
-
-        category_objs = []
+        from sqlalchemy import func as sa_func
+        # Ensure categories exist (get-or-create by slug)
+        existing_cats = (await db.execute(select(Category))).scalars().all()
+        by_slug = {c.slug: c for c in existing_cats}
+        category_objs = list(existing_cats)
         for cat_data in CATEGORIES:
-            cat = Category(**cat_data)
-            db.add(cat)
-            category_objs.append(cat)
+            if cat_data["slug"] not in by_slug:
+                cat = Category(**cat_data)
+                db.add(cat)
+                category_objs.append(cat)
         await db.flush()
 
         import re as slug_re
@@ -79,24 +200,44 @@ async def seed():
             text = slug_re.sub(r"[-\s]+", "-", text)
             return text
 
-        product_objs = []
-        for prod_data in PRODUCTS:
-            cat_name = prod_data.pop("category")
+        # Skip only when we already have a full 500+ catalog
+        try:
+            total_existing = (await db.execute(select(sa_func.count(Product.id)))).scalar() or 0
+        except Exception:
+            total_existing = 0
+        if total_existing >= 500:
+            print(f"Database already seeded ({total_existing} products)")
+            await db.commit()
+            return
+
+        existing_skus = set(
+            (await db.execute(select(Product.sku))).scalars().all()
+        )
+        catalog = _build_full_catalog(target_per_category=110)
+        inserted = 0
+        for prod_data in catalog:
+            if prod_data["sku"] in existing_skus:
+                continue
+            data = dict(prod_data)  # do not mutate global PRODUCTS
+            cat_name = data.pop("category")
             cat = next((c for c in category_objs if c.name == cat_name), None)
+            # Deterministic rating/reviews stable across runs
+            import hashlib as _hl
+            _h = int(_hl.md5(data["name"].encode()).hexdigest()[:8], 16)
             product = Product(
-                **prod_data,
-                slug=make_slug(prod_data["name"]),
+                **data,
+                slug=f"{make_slug(data['name'])}-{data['sku'].lower()}",
                 category=cat_name,
                 category_id=cat.id if cat else None,
-                rating=round(3.5 + (hash(prod_data["name"]) % 16) / 10, 1),
-                review_count=hash(prod_data["name"]) % 50 + 5,
+                rating=round(3.5 + (_h % 16) / 10, 1),
+                review_count=_h % 195 + 5,
             )
             db.add(product)
-            product_objs.append(product)
+            inserted += 1
         await db.flush()
 
         await db.commit()
-        print("Database seeded successfully!")
+        print(f"Database seeded successfully! inserted={inserted} catalog={len(catalog)}")
 
 
 if __name__ == "__main__":

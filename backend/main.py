@@ -1,12 +1,13 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from settings import settings
 from database import init_db
-from redis_client import redis_client
+from redis_client import init_redis, close_redis, redis_health, check_rate_limit
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -21,6 +22,7 @@ async def root():
     return {"message": "Nexmart API is running"}
 
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_URL, "http://localhost:5173", "http://localhost:3000"],
@@ -29,6 +31,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def redis_rate_limit_middleware(request: Request, call_next):
+    # Light global guard: 600 req/min per IP on API routes (fails open).
+    # Heavy per-route limits remain on SlowAPI where configured.
+    if request.url.path.startswith("/api/"):
+        client_ip = request.client.host if request.client else "unknown"
+        allowed, _ = await check_rate_limit(
+            f"rl:global:{client_ip}", limit=600, window_seconds=60
+        )
+        if not allowed:
+            return JSONResponse(
+                status_code=429, content={"detail": "Rate limit exceeded. Try again soon."}
+            )
+    return await call_next(request)
 
 
 @app.exception_handler(Exception)
@@ -57,6 +75,10 @@ app.include_router(newsletter.router, prefix="/api/newsletter", tags=["Newslette
 @app.on_event("startup")
 async def startup():
     try:
+        await init_redis()
+    except Exception as e:
+        print(f"Redis init skipped: {e}")
+    try:
         await init_db()
         app.state.db_ready = True
     except Exception as e:
@@ -72,13 +94,13 @@ async def startup():
 
 @app.on_event("shutdown")
 async def shutdown():
-    if redis_client:
-        try:
-            await redis_client.aclose()
-        except Exception:
-            pass
+    try:
+        await close_redis()
+    except Exception:
+        pass
 
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "db_ready": app.state.db_ready}
+    redis = await redis_health()
+    return {"status": "ok", "db_ready": app.state.db_ready, "redis": redis}
