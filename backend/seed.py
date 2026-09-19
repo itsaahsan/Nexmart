@@ -253,6 +253,7 @@ async def seed():
     await init_db()
     async with async_session() as db:
         from sqlalchemy import func as sa_func
+        from models.order import OrderItem
         # Ensure categories exist (get-or-create by slug)
         existing_cats = (await db.execute(select(Category))).scalars().all()
         by_slug = {c.slug: c for c in existing_cats}
@@ -262,6 +263,49 @@ async def seed():
                 cat = Category(**cat_data)
                 db.add(cat)
                 category_objs.append(cat)
+        await db.flush()
+
+        # Deduplicate: concurrent serverless cold starts may have inserted the
+        # same SKU twice. Keep order-referenced rows, else the oldest.
+        dup_skus = (
+            await db.execute(
+                select(Product.sku)
+                .group_by(Product.sku)
+                .having(sa_func.count(Product.id) > 1)
+            )
+        ).scalars().all()
+        removed = 0
+        for sku in dup_skus:
+            rows = (
+                await db.execute(
+                    select(Product)
+                    .where(Product.sku == sku)
+                    .order_by(Product.created_at.asc(), Product.id.asc())
+                )
+            ).scalars().all()
+            referenced = []
+            for r in rows:
+                n_items = (
+                    await db.execute(
+                        select(sa_func.count(OrderItem.id)).where(
+                            OrderItem.product_id == r.id
+                        )
+                    )
+                ).scalar() or 0
+                if n_items:
+                    referenced.append(r)
+            if referenced:
+                if len(referenced) == len(rows):
+                    continue  # all referenced; cannot dedup safely
+                keep_ids = {r.id for r in referenced}
+            else:
+                keep_ids = {rows[0].id}
+            for r in rows:
+                if r.id not in keep_ids:
+                    await db.delete(r)
+                    removed += 1
+        if removed:
+            print(f"Removed {removed} duplicate product rows")
         await db.flush()
 
         import re as slug_re
@@ -323,19 +367,20 @@ async def seed():
                 print(f"Backfilled images for {len(mismatch_skus)} products")
         await db.flush()
 
-        # Skip only when we already have a full 500+ catalog
+        # Skip only when we already have a full 500+ catalog with nothing missing
         try:
             total_existing = (await db.execute(select(sa_func.count(Product.id)))).scalar() or 0
         except Exception:
             total_existing = 0
-        if total_existing >= 500:
+        existing_skus = set(
+            (await db.execute(select(Product.sku))).scalars().all()
+        )
+        missing = [p for p in catalog if p["sku"] not in existing_skus]
+        if total_existing >= 500 and not missing:
             print(f"Database already seeded ({total_existing} products)")
             await db.commit()
             return
 
-        existing_skus = set(
-            (await db.execute(select(Product.sku))).scalars().all()
-        )
         inserted = 0
         for prod_data in catalog:
             if prod_data["sku"] in existing_skus:
@@ -356,9 +401,15 @@ async def seed():
             )
             db.add(product)
             inserted += 1
-        await db.flush()
-
-        await db.commit()
+        try:
+            await db.flush()
+            await db.commit()
+        except Exception as e:
+            # Another instance likely won the race on the same SKUs (UNIQUE).
+            # Roll back; dedup + missing-insert heal it on the next start.
+            await db.rollback()
+            print(f"Seed commit raced, rolled back ({e})")
+            return
         print(f"Database seeded successfully! inserted={inserted} catalog={len(catalog)}")
 
 
