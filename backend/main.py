@@ -14,6 +14,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Nexmart", version="1.0.0")
 app.state.limiter = limiter
 app.state.db_ready = False
+APP_REVISION = "5dc0ffb-seed-heal+1"  # bump on each deploy to verify live code
 
 
 @app.get("/")
@@ -103,4 +104,4 @@ async def shutdown():
 @app.get("/api/health")
 async def health():
     redis = await redis_health()
-    return {"status": "ok", "db_ready": app.state.db_ready, "redis": redis}
+    return {"status": "ok", "db_ready": app.state.db_ready, "redis": redis, "revision": APP_REVISION}
