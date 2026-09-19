@@ -27,6 +27,15 @@ from utils.stripe_utils import (
 router = APIRouter()
 
 
+@router.get("/config")
+async def stripe_config():
+    return {
+        "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
+        "currency": (settings.STRIPE_CURRENCY or "usd").lower(),
+        "demo_mode": not is_stripe_configured(),
+    }
+
+
 @router.get("", response_model=OrderListResponse)
 async def list_orders(
     page: int = Query(1, ge=1),
@@ -191,15 +200,6 @@ class CreateOrderRequest(BaseModel):
     shipping_address: dict
     items: list[CartItemIn]
     payment_intent_id: str | None = None
-
-
-@router.get("/config")
-async def stripe_config():
-    return {
-        "publishable_key": settings.STRIPE_PUBLISHABLE_KEY,
-        "currency": (settings.STRIPE_CURRENCY or "usd").lower(),
-        "demo_mode": not is_stripe_configured(),
-    }
 
 
 @router.post("/create-payment-intent")
