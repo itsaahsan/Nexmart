@@ -2,42 +2,58 @@
 node_modules/
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
-
-# Environment
-.env
-.env.local
-.env.production
-
-# Build
-dist/
-build/
+.env/
+pip-wheel-metadata/
 *.egg-info/
 
-# IDE
+# Environment & secrets (never commit real credentials)
+.env
+.env.local
+.env.*.local
+.env.production
+.env*
+!.env.example
+*.pem
+*.key
+
+# Build output
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Test / coverage artifacts
+.pytest_cache/
+.mypy_cache/
+test.db
+*.db
+*.sqlite
+*.sqlite3
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+
+# IDE & editors
 .vscode/
 .idea/
 *.swp
 *.swo
+*.swn
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Database
-*.db
-test.db
-
-# Python
-*.pyo
-.pytest_cache/
-.mypy_cache/
-
-# React
-*.tsbuildinfo
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Vercel
 .vercel/
-.vercel
-.env*

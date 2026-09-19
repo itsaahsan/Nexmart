@@ -24,7 +24,7 @@ A modern e-commerce platform built with React, FastAPI, and PostgreSQL.
 
 ## Features
 
-- 550+ product catalog with search, filters, sorting, and pagination
+- 550-product catalog with search, filters, sorting, and stable pagination
 - Shopping cart with database persistence
 - JWT auth with refresh + role-based access control
 - Checkout with real Stripe PaymentIntents and webhook-driven order updates
@@ -61,12 +61,15 @@ Nexmart/
 │   ├── public/
 │   └── package.json
 ├── backend/           # FastAPI backend
+│   ├── api/index.py   # Vercel serverless entrypoint (Mangum)
 │   ├── models/        # SQLAlchemy models
 │   ├── routers/       # API route handlers
 │   ├── schemas/       # Pydantic schemas
-│   ├── utils/         # Auth, Cloudinary, Stripe utilities
+│   ├── utils/         # Auth (JWT+RBAC), Stripe, Cloudinary utilities
 │   ├── tests/         # Pytest test suite
-│   ├── seed.py        # Database seeder
+│   ├── seed.py        # Deterministic 550-product seeder + healer
+│   ├── settings.py    # Env-based config
+│   ├── redis_client.py # Pooled Redis cache + rate limiter
 │   └── requirements.txt
 └── README.md
 ```
@@ -75,20 +78,38 @@ Nexmart/
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Node.js 18+ (for frontend only)
+- Python 3.11+ (backend)
+- Node.js 18+ (frontend)
+- PostgreSQL 15+ — local instance **or** a hosted DB (e.g. Neon). Redis is optional (the API fails open without it, caching/rate-limiting just stays off).
 
-### Quick Start
+### Backend
 
 ```bash
-git clone https://github.com/itsaahsan/Nexmart.git
-cd Nexmart
-docker compose up -d
+cd backend
+python -m venv .venv
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+# source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # then fill in DATABASE_URL, SECRET_KEY, Stripe keys
+uvicorn main:app --reload --port 8000
+```
+
+Backend API: http://localhost:8000 — docs: http://localhost:8000/docs
+
+The database seeds itself on startup (550 products across 5 categories; skips when already seeded).
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+echo "VITE_API_URL=http://localhost:8000" > .env
+npm run dev
 ```
 
 Frontend: http://localhost:5173
-Backend API: http://localhost:8000
-API Docs: http://localhost:8000/docs
 
 ### Running Tests
 
@@ -96,8 +117,15 @@ API Docs: http://localhost:8000/docs
 # Frontend
 cd frontend && npm test
 
-# Backend
-docker exec nexmart-backend-1 python -m pytest tests/ -v
+# Backend (needs Python env above; uses SQLite test DB)
+cd backend && python -m pytest tests/ -v
+```
+
+### Stripe Webhooks Locally
+
+```bash
+stripe listen --forward-to localhost:8000/api/orders/webhook
+# put the printed whsec_... value in backend/.env as STRIPE_WEBHOOK_SECRET
 ```
 
 ---
@@ -112,12 +140,15 @@ docker exec nexmart-backend-1 python -m pytest tests/ -v
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string (async format) |
+| `DATABASE_URL` | Yes | PostgreSQL connection string (async format, e.g. Neon) |
 | `SECRET_KEY` | Yes | JWT signing secret (min 32 chars) |
 | `FRONTEND_URL` | Yes | `https://nexmart-ecommerce-zeta.vercel.app` |
 | `ENVIRONMENT` | Yes | `production` |
+| `REDIS_URL` | No | Redis URL for product caching + rate limiting (app runs without it) |
 | `STRIPE_SECRET_KEY` | No | Stripe secret key for payments |
 | `STRIPE_PUBLISHABLE_KEY` | No | Stripe publishable key |
+| `STRIPE_WEBHOOK_SECRET` | No | Webhook signing secret (enables signature-verified order updates) |
+| `STRIPE_CURRENCY` | No | Currency code, default `usd` |
 | `CLOUDINARY_CLOUD_NAME` | No | Cloudinary cloud name |
 | `CLOUDINARY_API_KEY` | No | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | No | Cloudinary API secret |
@@ -139,24 +170,59 @@ docker exec nexmart-backend-1 python -m pytest tests/ -v
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/api/health` | No | Health check |
-| GET | `/api/products` | No | List products (paginated, filterable) |
+| GET | `/api/health` | No | Health check (DB + Redis status) |
+| GET | `/api/products` | No | List products (paginated, filterable, stable ordering) |
 | GET | `/api/products/featured` | No | Featured products |
+| GET | `/api/products/search-suggestions` | No | Name autocomplete |
 | GET | `/api/categories` | No | List categories |
-| POST | `/api/auth/register` | No | Register user |
+| POST | `/api/auth/register` | No | Register user (always `customer` role) |
 | POST | `/api/auth/login` | No | Login |
 | POST | `/api/auth/refresh` | No | Refresh JWT |
-| GET | `/api/auth/me` | Yes | Get current user |
+| GET | `/api/auth/me` | Yes | Get current user (incl. role) |
 | GET | `/api/cart` | Yes | Get cart |
 | POST | `/api/cart/add` | Yes | Add to cart |
-| POST | `/api/orders` | Yes | Create order |
-| GET | `/api/orders` | Yes | List orders |
+| PUT | `/api/cart/{product_id}` | Yes | Update quantity |
+| DELETE | `/api/cart/{product_id}` | Yes | Remove item |
+| POST | `/api/orders/create-payment-intent` | Yes | Server-priced Stripe PaymentIntent |
+| POST | `/api/orders` | Yes | Create order (verifies intent amount) |
+| GET | `/api/orders` | Yes | List own orders |
+| POST | `/api/orders/webhook` | No | Stripe webhook → order status updates |
+| GET | `/api/orders/config` | No | Publishable key + currency + demo flag |
 | POST | `/api/reviews` | Yes | Create review |
 | GET | `/api/wishlist` | Yes | Get wishlist |
-| POST | `/api/admin/dashboard` | Admin | Dashboard stats |
+| POST | `/api/wishlist/{product_id}` | Yes | Add to wishlist |
+| GET | `/api/admin/dashboard` | Admin | Revenue, AOV, status mix, low stock, top products |
 | GET | `/api/admin/products` | Admin | Admin product list |
 | GET | `/api/admin/users` | Admin | Admin user list |
+| PUT | `/api/admin/users/{user_id}` | Admin | Set role (`customer`/`support`/`manager`/`admin`) |
 | GET | `/api/admin/orders` | Admin | Admin order list |
+| PUT | `/api/admin/orders/{order_id}/status` | Admin | Update order status |
+
+## Roles & First Admin
+
+Roles: `customer` (default on register) → `support` → `manager` → `admin`.
+Enforced via `get_current_admin` / `require_role` / `require_permission` in
+`backend/utils/auth.py`. To promote the first admin, run once against the DB:
+
+```sql
+UPDATE users SET role = 'admin', is_admin = TRUE WHERE email = 'you@example.com';
+```
+
+## Operational Notes
+
+- **Seeding:** startup builds a deterministic 550-product catalog (37 curated +
+  generated, one subject-verified image per product). Existing rows are
+  reconciled by SKU; slugs, prices and ratings are never overwritten. A
+  `seed_meta` version marker keeps steady-state cold starts to ~2 queries.
+- **Schema updates:** `init_db()` runs `create_all()` plus additive migrations
+  (e.g. `users.role`); destructive resets only run with `ENVIRONMENT=development`.
+- **Redis:** optional. Without `REDIS_URL` the API serves everything from
+  Postgres (verified working); with it, product/category/admin responses are
+  cached and per-IP rate limiting is enforced.
+- **Stripe:** without keys the API runs in demo mode (`demo_mode: true`,
+  `pi_demo_*`); with test keys it creates real PaymentIntents and verifies
+  amounts server-side. Card confirmation happens client-side with the returned
+  `client_secret` (Stripe Elements integration is the remaining frontend item).
 
 ## License
 
