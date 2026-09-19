@@ -252,7 +252,9 @@ def _build_full_catalog(target_per_category: int = 110):
 async def seed():
     await init_db()
     async with async_session() as db:
+        from sqlalchemy import delete as sa_delete
         from sqlalchemy import func as sa_func
+        from sqlalchemy import update as sa_update
         from models.order import OrderItem
         # Ensure categories exist (get-or-create by slug)
         existing_cats = (await db.execute(select(Category))).scalars().all()
@@ -265,46 +267,51 @@ async def seed():
                 category_objs.append(cat)
         await db.flush()
 
-        # Deduplicate: concurrent serverless cold starts may have inserted the
-        # same SKU twice. Keep order-referenced rows, else the oldest.
-        dup_skus = (
+        catalog = _build_full_catalog(target_per_category=110)
+
+        # Deduplicate (bulk): concurrent serverless cold starts may have
+        # inserted the same SKU twice. Keep order-referenced rows, else oldest.
+        # Runs in ~4 queries regardless of catalog size.
+        all_rows = (
             await db.execute(
-                select(Product.sku)
-                .group_by(Product.sku)
-                .having(sa_func.count(Product.id) > 1)
+                select(Product.id, Product.sku, Product.created_at)
             )
-        ).scalars().all()
+        ).all()
+        by_sku: dict[str, list] = {}
+        for pid, sku, created in all_rows:
+            by_sku.setdefault(sku, []).append((pid, created))
+        dup_groups = {s: r for s, r in by_sku.items() if len(r) > 1}
         removed = 0
-        for sku in dup_skus:
-            rows = (
+        if dup_groups:
+            dup_ids = [pid for rows in dup_groups.values() for pid, _ in rows]
+            ref_rows = (
                 await db.execute(
-                    select(Product)
-                    .where(Product.sku == sku)
-                    .order_by(Product.created_at.asc(), Product.id.asc())
+                    select(OrderItem.product_id)
+                    .where(OrderItem.product_id.in_(dup_ids))
+                    .group_by(OrderItem.product_id)
                 )
             ).scalars().all()
-            referenced = []
-            for r in rows:
-                n_items = (
-                    await db.execute(
-                        select(sa_func.count(OrderItem.id)).where(
-                            OrderItem.product_id == r.id
-                        )
+            referenced = set(ref_rows)
+            delete_ids: list = []
+            for sku, rows in dup_groups.items():
+                rows_sorted = sorted(rows, key=lambda t: (t[1], t[0]))
+                ref_here = [pid for pid, _ in rows_sorted if pid in referenced]
+                if ref_here:
+                    if len(ref_here) == len(rows_sorted):
+                        continue  # all referenced; cannot dedup safely
+                    keep = set(ref_here)
+                else:
+                    keep = {rows_sorted[0][0]}
+                delete_ids.extend(
+                    pid for pid, _ in rows_sorted if pid not in keep
+                )
+            for i in range(0, len(delete_ids), 200):
+                await db.execute(
+                    sa_delete(Product).where(
+                        Product.id.in_(delete_ids[i : i + 200])
                     )
-                ).scalar() or 0
-                if n_items:
-                    referenced.append(r)
-            if referenced:
-                if len(referenced) == len(rows):
-                    continue  # all referenced; cannot dedup safely
-                keep_ids = {r.id for r in referenced}
-            else:
-                keep_ids = {rows[0].id}
-            for r in rows:
-                if r.id not in keep_ids:
-                    await db.delete(r)
-                    removed += 1
-        if removed:
+                )
+            removed = len(delete_ids)
             print(f"Removed {removed} duplicate product rows")
         await db.flush()
 
@@ -339,8 +346,6 @@ async def seed():
 
         # Backfill: reconcile image_url/images for existing GEN rows so older
         # seeds pick up the expanded unique-image pools (idempotent, 1 SELECT).
-        from sqlalchemy import update as sa_update
-
         desired = {
             p["sku"]: p["image_url"] for p in catalog if "-GEN-" in p["sku"]
         }
