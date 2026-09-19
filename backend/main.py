@@ -14,7 +14,7 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Nexmart", version="1.0.0")
 app.state.limiter = limiter
 app.state.db_ready = False
-APP_REVISION = "name-image-match"  # bump on each deploy to verify live code
+APP_REVISION = "role-migration-cors"  # bump on each deploy to verify live code
 
 
 @app.get("/")
@@ -50,13 +50,49 @@ async def redis_rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+import re as _re
+
+_ALLOWED_ORIGIN_RE = _re.compile(r"https://.*\.(onrender\.com|vercel\.app)$")
+
+
+def _cors_error_headers(request: Request) -> dict:
+    """Mirror the CORSMiddleware allowlist so error responses are CORS-safe.
+
+    Starlette's CORSMiddleware does not attach ACAO headers to responses
+    produced by the generic Exception handler, which makes browsers report a
+    CORS error that masks the real (JSON) failure. Echo an allowed Origin.
+    """
+    origin = request.headers.get("origin", "")
+    allowed = {
+        settings.FRONTEND_URL,
+        "http://localhost:5173",
+        "http://localhost:3000",
+    }
+    if origin and (origin in allowed or _ALLOWED_ORIGIN_RE.match(origin)):
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     import traceback
+    from fastapi import HTTPException
     traceback.print_exc()
+    headers = _cors_error_headers(request)
+    if isinstance(exc, HTTPException):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail},
+            headers=headers,
+        )
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)},
+        headers=headers,
     )
 
 from routers import auth, products, categories, cart, orders, reviews, wishlist, addresses, admin, newsletter

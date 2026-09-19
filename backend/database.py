@@ -66,16 +66,46 @@ async def get_db():
             raise
 
 
+async def run_lightweight_migrations() -> None:
+    """Additive, data-preserving schema updates for DBs created by older code.
+
+    create_all() never alters existing tables, so columns added to models
+    (e.g. users.role) must be added explicitly. Runs on startup; safe to
+    re-run. Skipped on SQLite (tests build fresh tables via create_all).
+    """
+    if _normalize_database_url(settings.DATABASE_URL).startswith("sqlite"):
+        return
+    from sqlalchemy import text
+
+    statements = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'customer'",
+        "UPDATE users SET role = 'admin' WHERE is_admin = TRUE AND (role IS NULL OR role = 'customer')",
+        "UPDATE users SET role = 'customer' WHERE role IS NULL OR role = ''",
+    ]
+    try:
+        async with engine.begin() as conn:
+            for stmt in statements:
+                await conn.execute(text(stmt))
+    except Exception as e:
+        # Never fail startup over a best-effort migration; endpoints will
+        # surface (CORS-safe) errors if something is still missing.
+        print(f"Lightweight migration skipped: {e}")
+
+
 async def init_db(max_retries=5, delay=5):
     for attempt in range(1, max_retries + 1):
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
             print("Database connected successfully")
+            await run_lightweight_migrations()
             return
         except Exception as e:
             err_str = str(e).lower()
-            if "incompatible types" in err_str or "does not exist" in err_str:
+            if (
+                settings.ENVIRONMENT == "development"
+                and ("incompatible types" in err_str or "does not exist" in err_str)
+            ):
                 print("Schema conflict detected, recreating all tables...")
                 try:
                     from sqlalchemy import text

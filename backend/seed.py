@@ -261,6 +261,44 @@ def _build_full_catalog(target_per_category: int = 110):
     return full
 
 
+SEED_VERSION = 4  # bump when the catalog/mapping changes to force reconciliation
+
+
+async def _seed_marker(db) -> str | None:
+    from sqlalchemy import text as sa_text
+
+    try:
+        await db.execute(
+            sa_text(
+                "CREATE TABLE IF NOT EXISTS seed_meta "
+                "(key TEXT PRIMARY KEY, value TEXT)"
+            )
+        )
+        row = (
+            await db.execute(
+                sa_text("SELECT value FROM seed_meta WHERE key = 'version'")
+            )
+        ).scalar_one_or_none()
+        return row
+    except Exception:
+        return None
+
+
+async def _set_seed_marker(db, value: str) -> None:
+    from sqlalchemy import text as sa_text
+
+    try:
+        await db.execute(
+            sa_text(
+                "INSERT INTO seed_meta (key, value) VALUES ('version', :v) "
+                "ON CONFLICT (key) DO UPDATE SET value = :v"
+            ),
+            {"v": value},
+        )
+    except Exception as e:
+        print(f"Seed marker skipped: {e}")
+
+
 async def seed():
     await init_db()
     async with async_session() as db:
@@ -268,6 +306,18 @@ async def seed():
         from sqlalchemy import func as sa_func
         from sqlalchemy import update as sa_update
         from models.order import OrderItem
+        # Fast path: steady-state cold starts skip all reconciliation work.
+        try:
+            marker = await _seed_marker(db)
+            total_fast = (
+                await db.execute(select(sa_func.count(Product.id)))
+            ).scalar() or 0
+            if marker == str(SEED_VERSION) and total_fast >= 550:
+                print(f"Seed up to date (v{marker}, {total_fast} products)")
+                await db.commit()
+                return
+        except Exception as e:
+            print(f"Seed fast-path skipped: {e}")
         # Ensure categories exist (get-or-create by slug)
         existing_cats = (await db.execute(select(Category))).scalars().all()
         by_slug = {c.slug: c for c in existing_cats}
@@ -413,6 +463,7 @@ async def seed():
         missing = [p for p in catalog if p["sku"] not in existing_skus]
         if total_existing >= 500 and not missing:
             print(f"Database already seeded ({total_existing} products)")
+            await _set_seed_marker(db, str(SEED_VERSION))
             await db.commit()
             return
 
@@ -438,6 +489,7 @@ async def seed():
             inserted += 1
         try:
             await db.flush()
+            await _set_seed_marker(db, str(SEED_VERSION))
             await db.commit()
         except Exception as e:
             # Another instance likely won the race on the same SKUs (UNIQUE).
